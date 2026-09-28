@@ -40,6 +40,26 @@ const next = projects[(i + 1) % projects.length];
           <p class="tagline">{p.tagline}</p>
         </header>
 
+        {
+          p.brand?.shot && (
+            <a
+              class="shot reveal"
+              href={p.links[0]?.href}
+              target="_blank"
+              rel="noopener"
+              aria-label={`Open ${p.name}`}
+            >
+              <span class="shot-bar" aria-hidden="true">
+                <i />
+                <i />
+                <i />
+                <span class="shot-url mono">{p.links[0]?.label}</span>
+              </span>
+              <img src={p.brand.shot} alt={`${p.name} website`} width="1280" height="800" loading="eager" />
+            </a>
+          )
+        }
+
         <div class="body reveal">
           <section>
             <h2 class="eyebrow">What it is</h2>
@@ -122,6 +142,46 @@ const next = projects[(i + 1) % projects.length];
       transparent 70%
     );
     pointer-events: none;
+  }
+  .shot {
+    display: block;
+    margin-top: 32px;
+    border-radius: var(--ag-radius-lg);
+    overflow: hidden;
+    border: 1px solid color-mix(in srgb, var(--brand) 35%, var(--ag-border));
+    background: var(--ag-well);
+    box-shadow:
+      0 40px 80px -40px color-mix(in srgb, var(--brand) 55%, transparent),
+      0 20px 40px -20px rgba(0, 0, 0, 0.6);
+    transition: transform var(--ag-dur-slow) var(--ag-ease);
+  }
+  .shot:hover {
+    transform: translateY(-3px);
+    text-decoration: none;
+  }
+  .shot-bar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 9px 12px;
+    background: var(--ag-inset-2);
+    border-bottom: 1px solid var(--ag-border);
+  }
+  .shot-bar i {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: var(--ag-border-2);
+  }
+  .shot-url {
+    margin-left: 10px;
+    font-size: var(--ag-fs-mini);
+    color: var(--ag-muted);
+  }
+  .shot img {
+    display: block;
+    width: 100%;
+    height: auto;
   }
   .title-row {
     display: flex;

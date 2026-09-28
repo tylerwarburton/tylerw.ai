@@ -36,6 +36,8 @@ export interface Brand {
   logo?: string;
   /** Tile behind the logo: 'dark' (default) or 'light' for dark line art. */
   tile?: 'light' | 'dark';
+  /** Screenshot of the live product under /public/shots (1280x800). */
+  shot?: string;
 }
 
 export interface Project {
@@ -98,7 +100,7 @@ export const projects: Project[] = [
     slug: 'heyhauler',
     name: 'HeyHauler',
     category: 'ai',
-    tagline: 'SaaS for hauling businesses: dumpsters, jobs, and clients.',
+    tagline: 'Roll-off dispatch, billing, and fleet control.',
     summary: 'Software for companies that haul things, like roll-off dumpsters: orders, drivers, yards, disposal, invoicing, and payments. Clients request and track their jobs in the same system the crew runs on.',
     role: 'CTO & lead engineer',
     involvement:
@@ -108,13 +110,14 @@ export const projects: Project[] = [
     status: 'Live',
     company: 'CipherPlay',
     links: [{ label: 'heyhauler.com', href: 'https://heyhauler.com' }],
+    brand: { color: '#D9D400', logo: '/brands/heyhauler.svg', shot: '/shots/heyhauler.webp' },
     featured: true,
   },
   {
     slug: 'breederops',
     name: 'BreederOps',
     category: 'ai',
-    tagline: 'The all-in-one manager for animal breeding operations.',
+    tagline: 'Run the breeding business. All in one place.',
     summary: 'Management software for agricultural animal raising, starting with rodents bred for pets and reptile food: racks, breeders, litters, health, and output. Incubator tracking for reptiles and support for dog breeders are next, so it becomes the one place to run any breeding operation.',
     role: 'CTO & lead engineer',
     involvement:
@@ -124,12 +127,13 @@ export const projects: Project[] = [
     status: 'Live',
     company: 'CipherPlay',
     links: [{ label: 'breederops.com', href: 'https://breederops.com' }],
+    brand: { color: '#A3E635', logo: '/brands/breederops.webp', shot: '/shots/breederops.webp' },
   },
   {
     slug: 'gauntlet',
     name: 'Gauntlet',
     category: 'ai',
-    tagline: 'Kahoot meets a slide deck: live team quizzes on the big screen.',
+    tagline: 'Interactive presentations for company leadership and education.',
     summary:
       'Presenters click through a deck on the projector while everyone in the room follows on their phone, answers when a slide is a question, and is scored on speed and accuracy. Individual and team leaderboards roll up live; attendees join with a short code, no accounts.',
     role: 'CTO & lead engineer',
@@ -140,7 +144,7 @@ export const projects: Project[] = [
     status: 'Live',
     company: 'CipherPlay',
     links: [{ label: 'gauntlet.tylerw.ai', href: 'https://gauntlet.tylerw.ai' }],
-    brand: { color: '#A6FF00', logo: '/brands/gauntlet.svg' },
+    brand: { color: '#A6FF00', logo: '/brands/gauntlet.webp', shot: '/shots/gauntlet.webp' },
   },
   {
     slug: 'sprite-core',
@@ -188,7 +192,7 @@ export const projects: Project[] = [
     slug: 'paralith',
     name: 'Paralith Markets',
     category: 'crypto',
-    tagline: 'Bridge, trade, and play on AO.',
+    tagline: 'Bridge. Trade. Play. All on AO.',
     summary:
       'An orderbook exchange, a cross-chain stablecoin bridge from Base, Solana, and Sui, and the Rune Realm game, all on AO. PUSD is minted one-for-one against stablecoins locked on the source chain.',
     role: 'Lead engineer',
@@ -202,13 +206,14 @@ export const projects: Project[] = [
       { label: 'paralithmarkets.com', href: 'https://paralithmarkets.com' },
       { label: 'Docs', href: 'https://docs.paralithmarkets.com' },
     ],
+    brand: { color: '#967AFF', logo: '/brands/paralith.svg', shot: '/shots/paralith.webp' },
     featured: true,
   },
   {
     slug: 'opportunity',
     name: 'Opportunity',
     category: 'crypto',
-    tagline: 'Options contracts on tokenized stocks, on Robinhood Chain.',
+    tagline: 'Options on all your favorite assets, on Robinhood Chain.',
     summary: 'An options platform for tokenized stocks on Robinhood Chain. Issuers lock collateral and mint transferable option contracts that anyone can trade, exercise, or let expire.',
     role: 'Technical lead',
     involvement: 'Lead the technical side: the collateral-backed options contracts, their test suite, and the issuing app.',
@@ -221,6 +226,7 @@ export const projects: Project[] = [
       { label: 'App', href: 'https://app.opportunitytrade.com' },
       { label: 'Contracts', href: 'https://github.com/CipherPlayLabs/opportunity-options-contracts' },
     ],
+    brand: { color: '#3559E8', logo: '/brands/opportunity.svg', shot: '/shots/opportunity.webp' },
     featured: true,
   },
   {
