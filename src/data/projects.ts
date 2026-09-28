@@ -29,6 +29,15 @@ export interface ProjectLink {
   href: string;
 }
 
+export interface Brand {
+  /** Primary brand colour, used for the card edge, glow, and page accent. */
+  color: string;
+  /** Logo under /public/brands. */
+  logo?: string;
+  /** Tile behind the logo: 'dark' (default) or 'light' for dark line art. */
+  tile?: 'light' | 'dark';
+}
+
 export interface Project {
   slug: string;
   name: string;
@@ -45,6 +54,7 @@ export interface Project {
   status: 'Live' | 'Active' | 'Testnet' | 'Shipped' | 'In development';
   company?: string;
   links: ProjectLink[];
+  brand?: Brand;
   featured?: boolean;
 }
 
@@ -119,16 +129,18 @@ export const projects: Project[] = [
     slug: 'gauntlet',
     name: 'Gauntlet',
     category: 'ai',
-    tagline: 'Live team quizzes built into your slide deck.',
+    tagline: 'Kahoot meets a slide deck: live team quizzes on the big screen.',
     summary:
-      'A presentation platform where the audience joins teams by QR code and competes on speed and accuracy in real time. Presenters build decks in an admin studio with several question types and printable team labels.',
+      'Presenters click through a deck on the projector while everyone in the room follows on their phone, answers when a slide is a question, and is scored on speed and accuracy. Individual and team leaderboards roll up live; attendees join with a short code, no accounts.',
     role: 'CTO & lead engineer',
-    involvement: 'Built it from the initial scaffold: real-time engine, studio, and deployment.',
+    involvement:
+      'Built it from the initial scaffold: the real-time engine, the authoring studio, question types, scoring, and deployment. A product for The Cyber Space.',
     stack: ['Next.js', 'Socket.IO', 'Redis', 'Prisma', 'Postgres'],
     years: '2026 to now',
-    status: 'Active',
+    status: 'Live',
     company: 'CipherPlay',
-    links: [],
+    links: [{ label: 'gauntlet.tylerw.ai', href: 'https://gauntlet.tylerw.ai' }],
+    brand: { color: '#A6FF00', logo: '/brands/gauntlet.svg' },
   },
   {
     slug: 'sprite-core',
@@ -146,6 +158,7 @@ export const projects: Project[] = [
       { label: 'GitHub', href: 'https://github.com/tylerwarburton/sprite-core' },
       { label: 'npm', href: 'https://www.npmjs.com/package/@tylerwarburton/sprite-core' },
     ],
+    brand: { color: '#2f81f7' },
   },
 
   // — Crypto & Web3 ——————————————————————————————————————————
@@ -168,6 +181,7 @@ export const projects: Project[] = [
       { label: 'GitHub', href: 'https://github.com/RandAOLabs' },
       { label: 'ao-js-sdk', href: 'https://github.com/RandAOLabs/ao-js-sdk' },
     ],
+    brand: { color: '#e8e8e8', logo: '/brands/randao.webp' },
     featured: true,
   },
   {
@@ -184,7 +198,10 @@ export const projects: Project[] = [
     years: '2024 to now',
     status: 'Live',
     company: 'CipherPlay',
-    links: [{ label: 'Docs', href: 'https://docs.paralithmarkets.com' }],
+    links: [
+      { label: 'paralithmarkets.com', href: 'https://paralithmarkets.com' },
+      { label: 'Docs', href: 'https://docs.paralithmarkets.com' },
+    ],
     featured: true,
   },
   {
@@ -224,6 +241,7 @@ export const projects: Project[] = [
       { label: 'GitHub', href: 'https://github.com/RandAOLabs/rewind' },
       { label: 'Grant', href: 'https://github.com/ar-io/ar-io-grants/issues/36' },
     ],
+    brand: { color: '#84e9e4', logo: '/brands/rewind.webp' },
   },
   {
     slug: 'arcao',
@@ -241,6 +259,7 @@ export const projects: Project[] = [
       { label: 'arcao.xyz', href: 'https://arcao.xyz' },
       { label: 'GitHub', href: 'https://github.com/ArcAOGaming' },
     ],
+    brand: { color: '#f5f5f5', logo: '/brands/arcao.webp', tile: 'light' },
   },
   {
     slug: 'satoshis-palace',
@@ -276,6 +295,7 @@ export const projects: Project[] = [
       { label: 'Landing', href: 'https://github.com/InfrAOLabs/Infrao-landingpage' },
       { label: 'Docs', href: 'https://github.com/InfrAOLabs/InfrAO-Docs' },
     ],
+    brand: { color: '#d9d9d9', logo: '/brands/infrao.webp' },
   },
 
   // — Hardware & Firmware ————————————————————————————————————
@@ -312,6 +332,7 @@ export const projects: Project[] = [
       { label: 'HardwareMiner', href: 'https://github.com/RandAOLabs/HardwareMiner' },
       { label: 'pifigo', href: 'https://github.com/ToddE/pifigo' },
     ],
+    brand: { color: '#e8e8e8', logo: '/brands/randao.webp' },
   },
   {
     slug: 'spark-console',

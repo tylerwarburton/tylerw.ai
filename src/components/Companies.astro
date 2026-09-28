@@ -10,6 +10,12 @@ const monogram = (name: string) =>
     .join('')
     .slice(0, 3)
     .toUpperCase();
+
+// Real logos where we have them (from each company's own brand assets).
+const logos: Record<string, string> = {
+  cipherplay: '/brands/cipherplay.svg',
+  randao: '/brands/randao.webp',
+};
 ---
 
 <section class="section companies" id="companies">
@@ -30,8 +36,12 @@ const monogram = (name: string) =>
           const total = tenure(g);
           return (
             <li class="co">
-              <span class="logo" aria-hidden="true">
-                {monogram(g.company)}
+              <span class:list={['logo', { img: logos[g.company.toLowerCase()] }]} aria-hidden="true">
+                {logos[g.company.toLowerCase()] ? (
+                  <img src={logos[g.company.toLowerCase()]} alt="" width="48" height="48" loading="lazy" />
+                ) : (
+                  monogram(g.company)
+                )}
               </span>
               <div class="co-body">
                 {multi ? (
@@ -145,6 +155,15 @@ const monogram = (name: string) =>
     font-weight: var(--ag-fw-semi);
     font-size: 13px;
     letter-spacing: 0.02em;
+  }
+  .logo.img {
+    background: var(--ag-well);
+    padding: 6px;
+  }
+  .logo img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
   }
   .co-head {
     display: flex;
