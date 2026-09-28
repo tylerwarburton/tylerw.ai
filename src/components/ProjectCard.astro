@@ -1,0 +1,106 @@
+---
+import type { Project } from '../data/projects';
+import { categories } from '../data/projects';
+import Icon from './Icon.astro';
+
+interface Props {
+  project: Project;
+}
+const { project: p } = Astro.props;
+---
+
+<a class="pcard spot" href={`/projects/${p.slug}`} data-cat={p.category}>
+  <div class="pc-top">
+    <span class="pc-cat mono">{categories[p.category].short}</span>
+    <span class:list={['pc-status mono', p.status.toLowerCase().replace(' ', '-')]}>{p.status}</span>
+  </div>
+  <h3 class="pc-name">{p.name}</h3>
+  <p class="pc-tag">{p.tagline}</p>
+  <div class="pc-foot">
+    <span class="pc-role">{p.role}</span>
+    <span class="pc-go" aria-hidden="true"><Icon name="arrow-right" size={16} /></span>
+  </div>
+</a>
+
+<style>
+  .pcard {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    min-height: 196px;
+    padding: 20px;
+    background: var(--ag-panel);
+    border: 1px solid var(--ag-border);
+    border-radius: var(--ag-radius-md);
+    color: inherit;
+    text-decoration: none;
+    overflow: hidden;
+    transition:
+      border-color var(--ag-dur-base) var(--ag-ease),
+      transform var(--ag-dur-base) var(--ag-ease);
+  }
+  .pcard:hover {
+    text-decoration: none;
+    border-color: var(--ag-accent-50);
+    transform: translateY(-2px);
+  }
+  .pc-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .pc-cat {
+    font-size: var(--ag-fs-micro);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--ag-accent);
+  }
+  .pc-status {
+    font-size: var(--ag-fs-micro);
+    color: var(--ag-muted);
+    border: 1px solid var(--ag-border-2);
+    border-radius: var(--ag-radius-pill);
+    padding: 2px 8px;
+  }
+  .pc-status.live {
+    color: var(--ag-green);
+    border-color: rgba(74, 222, 128, 0.35);
+  }
+  .pc-status.testnet,
+  .pc-status.in-development {
+    color: var(--ag-amber);
+    border-color: rgba(251, 191, 36, 0.3);
+  }
+  .pc-name {
+    font-size: 19px;
+    font-weight: var(--ag-fw-semi);
+    color: var(--ag-text-bright);
+    letter-spacing: -0.01em;
+    margin-top: 4px;
+  }
+  .pc-tag {
+    color: var(--ag-muted);
+    font-size: var(--ag-fs-body);
+    line-height: 1.5;
+  }
+  .pc-foot {
+    margin-top: auto;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: 8px;
+  }
+  .pc-role {
+    font-size: var(--ag-fs-small);
+    color: var(--ag-text-3);
+  }
+  .pc-go {
+    color: var(--ag-muted);
+    transition: transform var(--ag-dur-base) var(--ag-ease), color var(--ag-dur-base) var(--ag-ease);
+  }
+  .pcard:hover .pc-go {
+    color: var(--ag-accent);
+    transform: translateX(3px);
+  }
+</style>

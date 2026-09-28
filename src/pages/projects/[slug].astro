@@ -1,0 +1,258 @@
+---
+import Base from '../../layouts/Base.astro';
+import Nav from '../../components/Nav.astro';
+import Footer from '../../components/Footer.astro';
+import Icon from '../../components/Icon.astro';
+import ProjectCard from '../../components/ProjectCard.astro';
+import { categories, projects, type Project } from '../../data/projects';
+import { site } from '../../data/site';
+
+export function getStaticPaths() {
+  return projects.map((project) => ({ params: { slug: project.slug }, props: { project } }));
+}
+
+const { project: p } = Astro.props as { project: Project };
+const related = projects.filter((x) => x.slug !== p.slug && (x.category === p.category || (p.company && x.company === p.company))).slice(0, 3);
+const i = projects.indexOf(p);
+const next = projects[(i + 1) % projects.length];
+---
+
+<Base title={`${p.name} · ${site.name}`} description={p.summary}>
+  <Nav />
+  <main>
+    <article class="project">
+      <div class="grid-bg"></div>
+      <div class="container narrow">
+        <a class="back reveal" href={`/projects#${p.category}`}>← {categories[p.category].label}</a>
+
+        <header class="reveal">
+          <div class="chips">
+            <span class="chip mono">{categories[p.category].short}</span>
+            <span class:list={['chip mono status', p.status.toLowerCase().replace(' ', '-')]}>{p.status}</span>
+            <span class="chip mono">{p.years}</span>
+          </div>
+          <h1 class="name">{p.name}</h1>
+          <p class="tagline">{p.tagline}</p>
+        </header>
+
+        <div class="body reveal">
+          <section>
+            <h2 class="eyebrow">What it is</h2>
+            <p>{p.summary}</p>
+          </section>
+          <section>
+            <h2 class="eyebrow">My role · {p.role}</h2>
+            <p>{p.involvement}</p>
+          </section>
+        </div>
+
+        <dl class="facts reveal">
+          {
+            p.company && (
+              <div>
+                <dt>Company</dt>
+                <dd>{p.company}</dd>
+              </div>
+            )
+          }
+          <div>
+            <dt>Stack</dt>
+            <dd class="stack">{p.stack.map((s) => <span class="mono">{s}</span>)}</dd>
+          </div>
+        </dl>
+
+        {
+          p.links.length > 0 && (
+            <div class="links reveal">
+              {p.links.map((l, j) => (
+                <a class:list={['btn', j === 0 ? 'btn-primary' : 'btn-ghost']} href={l.href} target="_blank" rel="noopener">
+                  {l.label} <Icon name="arrow-up-right" size={16} />
+                </a>
+              ))}
+            </div>
+          )
+        }
+      </div>
+    </article>
+
+    {
+      related.length > 0 && (
+        <section class="related">
+          <div class="container">
+            <div class="rel-head">
+              <h2 class="section-title">Related</h2>
+              <a href={`/projects/${next.slug}`} class="next">
+                Next: {next.name} <Icon name="arrow-right" size={14} />
+              </a>
+            </div>
+            <div class="grid">
+              {related.map((r) => (
+                <div class="reveal">
+                  <ProjectCard project={r} />
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )
+    }
+  </main>
+  <Footer />
+</Base>
+
+<style>
+  .project {
+    position: relative;
+    overflow: hidden;
+    padding-block: clamp(40px, 7vw, 88px) clamp(32px, 5vw, 56px);
+  }
+  .narrow {
+    max-width: 780px;
+  }
+  .back {
+    display: inline-block;
+    font-size: var(--ag-fs-base);
+    color: var(--ag-muted);
+    margin-bottom: 28px;
+  }
+  .back:hover {
+    color: var(--ag-accent);
+    text-decoration: none;
+  }
+  .chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .chip {
+    font-size: var(--ag-fs-mini);
+    color: var(--ag-text-2);
+    border: 1px solid var(--ag-border-2);
+    border-radius: var(--ag-radius-pill);
+    padding: 3px 10px;
+  }
+  .chip:first-child {
+    color: var(--ag-accent);
+    border-color: var(--ag-accent-50);
+    background: var(--ag-accent-12);
+  }
+  .status.live {
+    color: var(--ag-green);
+    border-color: rgba(74, 222, 128, 0.35);
+  }
+  .status.testnet,
+  .status.in-development {
+    color: var(--ag-amber);
+    border-color: rgba(251, 191, 36, 0.3);
+  }
+  .name {
+    margin-top: 18px;
+    font-size: clamp(38px, 7vw, 64px);
+    font-weight: var(--ag-fw-semi);
+    letter-spacing: -0.03em;
+    line-height: 1.02;
+    color: var(--ag-text-bright);
+  }
+  .tagline {
+    margin-top: 14px;
+    font-size: clamp(17px, 2.2vw, 21px);
+    color: var(--ag-text-2);
+    line-height: 1.45;
+  }
+  .body {
+    display: grid;
+    gap: 24px;
+    margin-top: 40px;
+  }
+  .body p {
+    margin-top: 8px;
+    font-size: 16px;
+    line-height: 1.7;
+    color: var(--ag-text-3);
+  }
+  .facts {
+    margin: 32px 0 0;
+    display: grid;
+    gap: 0;
+    border: 1px solid var(--ag-border);
+    border-radius: var(--ag-radius-md);
+    background: var(--ag-panel);
+  }
+  .facts > div {
+    display: grid;
+    grid-template-columns: 110px 1fr;
+    gap: 12px;
+    padding: 14px 16px;
+  }
+  .facts > div + div {
+    border-top: 1px solid var(--ag-border);
+  }
+  dt {
+    color: var(--ag-muted);
+    font-size: var(--ag-fs-base);
+  }
+  dd {
+    margin: 0;
+    color: var(--ag-text);
+  }
+  .stack {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .stack span {
+    font-size: var(--ag-fs-small);
+    color: var(--ag-text-code);
+    background: var(--ag-well-2);
+    border: 1px solid var(--ag-border);
+    border-radius: var(--ag-radius-xs);
+    padding: 2px 8px;
+  }
+  .links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 28px;
+  }
+  .related {
+    padding-block: clamp(32px, 5vw, 64px) clamp(56px, 8vw, 96px);
+    border-top: 1px solid var(--ag-border);
+  }
+  .rel-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  .next {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: var(--ag-fs-base);
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+    margin-top: 20px;
+  }
+  .grid > div {
+    display: grid;
+  }
+  @media (max-width: 900px) {
+    .grid {
+      grid-template-columns: 1fr;
+    }
+  }
+  @media (max-width: 480px) {
+    .facts > div {
+      grid-template-columns: 1fr;
+      gap: 6px;
+    }
+    .links .btn {
+      flex: 1 1 100%;
+      justify-content: center;
+    }
+  }
+</style>

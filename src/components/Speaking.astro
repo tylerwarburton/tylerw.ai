@@ -1,0 +1,160 @@
+---
+import { site } from '../data/site';
+import Icon from './Icon.astro';
+const { speaking, group } = site;
+---
+
+<section class="section speaking" id="speaking">
+  <div class="container">
+    <div class="head reveal">
+      <p class="eyebrow">Public work</p>
+      <h2 class="section-title">Talks, teaching, and the room I run.</h2>
+      <p class="sub">{speaking.intro}</p>
+    </div>
+
+    <div class="layout">
+      <div class="group-card reveal">
+        <div class="grid-bg"></div>
+        <div class="group-inner">
+          <span class="tag mono">AI meetup group</span>
+          <h3 class="group-name">{group.name}</h3>
+          <p class="group-blurb">{group.blurb}</p>
+          <a class="btn btn-primary" href={group.href} target="_blank" rel="noopener">
+            <Icon name="users" size={18} />
+            {group.label}
+            <Icon name="arrow-up-right" size={16} />
+          </a>
+        </div>
+      </div>
+
+      <ul class="items">
+        {
+          speaking.items.map((it) => (
+            <li class="reveal">
+              <a
+                class="item spot"
+                href={it.href}
+                {...(it.href.startsWith('http') ? { target: '_blank', rel: 'noopener' } : {})}
+              >
+                <span class="kind mono">{it.kind}</span>
+                <span class="title">{it.title}</span>
+                <span class="where">{it.where}</span>
+              </a>
+            </li>
+          ))
+        }
+      </ul>
+    </div>
+  </div>
+</section>
+
+<style>
+  .head {
+    max-width: 660px;
+  }
+  .section-title {
+    margin-top: 12px;
+  }
+  .sub {
+    margin-top: 12px;
+    color: var(--ag-muted);
+  }
+  .layout {
+    display: grid;
+    grid-template-columns: 1fr 1.1fr;
+    gap: 12px;
+    margin-top: 28px;
+  }
+  .tag {
+    display: inline-block;
+    align-self: flex-start;
+    font-size: var(--ag-fs-mini);
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    color: var(--ag-accent);
+    background: var(--ag-accent-12);
+    border: 1px solid var(--ag-accent-50);
+    border-radius: var(--ag-radius-pill);
+    padding: 4px 10px;
+  }
+  .group-card {
+    position: relative;
+    overflow: hidden;
+    background: radial-gradient(ellipse at 0% 0%, rgba(91, 141, 239, 0.18), transparent 60%), var(--ag-panel);
+    border: 1px solid var(--ag-accent-22);
+    border-radius: var(--ag-radius-lg);
+    padding: clamp(22px, 3.5vw, 36px);
+  }
+  .group-inner {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    height: 100%;
+  }
+  .group-name {
+    font-size: clamp(26px, 3.4vw, 34px);
+    font-weight: var(--ag-fw-semi);
+    color: var(--ag-text-bright);
+    letter-spacing: -0.02em;
+  }
+  .group-blurb {
+    color: var(--ag-muted);
+    line-height: 1.6;
+    max-width: 44ch;
+  }
+  .group-inner .btn {
+    margin-top: auto;
+    align-self: flex-start;
+  }
+  .items {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .item {
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 18px 20px;
+    background: var(--ag-panel);
+    border: 1px solid var(--ag-border);
+    border-radius: var(--ag-radius-md);
+    color: inherit;
+    transition: border-color var(--ag-dur-base) var(--ag-ease);
+  }
+  .item:hover {
+    text-decoration: none;
+    border-color: var(--ag-accent-50);
+  }
+  .kind {
+    font-size: var(--ag-fs-micro);
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: var(--ag-accent);
+  }
+  .title {
+    color: var(--ag-text-bright);
+    font-weight: var(--ag-fw-semi);
+    font-size: 16px;
+  }
+  .where {
+    color: var(--ag-muted);
+    font-size: var(--ag-fs-base);
+  }
+  @media (max-width: 820px) {
+    .layout {
+      grid-template-columns: 1fr;
+    }
+    .group-inner .btn {
+      align-self: stretch;
+      justify-content: center;
+      margin-top: 8px;
+    }
+  }
+</style>

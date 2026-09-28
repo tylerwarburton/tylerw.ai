@@ -1,0 +1,228 @@
+---
+import { site, compact } from '../data/site';
+import { projects } from '../data/projects';
+import { getGithubStats } from '../data/github';
+
+const gh = await getGithubStats();
+const sources = [...site.tokens.sources].sort((a, b) => b.value - a.value);
+const totalTokens = sources.reduce((a, s) => a + s.value, 0);
+
+const tiles = [
+  { value: gh.total, label: 'commits shipped', suffix: '+' },
+  { value: projects.length, label: 'products built', suffix: '' },
+  { value: site.companies.length, label: 'companies', suffix: '' },
+];
+---
+
+<section class="section numbers" id="numbers">
+  <div class="container">
+    <div class="tokens card-glow reveal">
+      <div class="t-head">
+        <p class="eyebrow">Lifetime AI tokens</p>
+        <p class="t-asof mono">as of {site.tokens.asOf}</p>
+      </div>
+      <p class="t-total">
+        <span class="count mono" data-to={totalTokens} data-format="tokens">{compact(totalTokens)}</span>
+        <span class="t-unit">tokens</span>
+      </p>
+      <p class="t-sub">Across Claude, OpenAI, OpenRouter, and local models. This is how I work: AI in every loop.</p>
+
+      <div class="bar" role="img" aria-label={sources.map((s) => `${s.label} ${compact(s.value)}`).join(', ')}>
+        {
+          sources.map((s) => (
+            <span
+              class="seg"
+              style={`--w:${Math.max((s.value / totalTokens) * 100, 0.8)}%;--c:${s.color}`}
+              title={`${s.label}: ${compact(s.value)}`}
+            />
+          ))
+        }
+      </div>
+      <ul class="legend">
+        {
+          sources.map((s) => (
+            <li>
+              <span class="sw" style={`--c:${s.color}`} />
+              <span class="lg-label">{s.label}</span>
+              <span class="lg-val mono">{compact(s.value)}</span>
+            </li>
+          ))
+        }
+      </ul>
+    </div>
+
+    <div class="tiles">
+      {
+        tiles.map((t) => (
+          <div class="tile reveal">
+            <span class="tile-val mono">
+              <span class="count" data-to={t.value}>{t.value.toLocaleString('en-US')}</span>{t.suffix}
+            </span>
+            <span class="tile-label">{t.label}</span>
+          </div>
+        ))
+      }
+    </div>
+  </div>
+</section>
+
+<script>
+  import { compact } from '../data/site';
+  const els = document.querySelectorAll<HTMLElement>('.numbers .count');
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const fmt = (el: HTMLElement, n: number) =>
+    el.dataset.format === 'tokens' ? compact(n) : Math.round(n).toLocaleString('en-US');
+  const run = (el: HTMLElement) => {
+    const to = Number(el.dataset.to);
+    if (reduced) return;
+    const start = performance.now();
+    const dur = 1600;
+    const tick = (now: number) => {
+      const p = Math.min((now - start) / dur, 1);
+      const e = 1 - Math.pow(1 - p, 4);
+      el.textContent = fmt(el, to * e);
+      if (p < 1) requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  };
+  const io = new IntersectionObserver(
+    (entries) =>
+      entries.forEach((en) => {
+        if (en.isIntersecting) {
+          run(en.target as HTMLElement);
+          io.unobserve(en.target);
+        }
+      }),
+    { threshold: 0.4 },
+  );
+  els.forEach((el) => io.observe(el));
+</script>
+
+<style>
+  .numbers {
+    padding-top: clamp(24px, 4vw, 48px);
+  }
+  .tokens {
+    position: relative;
+    padding: clamp(22px, 4vw, 40px);
+    border-radius: var(--ag-radius-lg);
+  }
+  .t-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 12px;
+  }
+  .t-asof {
+    font-size: var(--ag-fs-mini);
+    color: var(--ag-muted);
+  }
+  .t-total {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 6px 14px;
+    margin-top: 14px;
+  }
+  .t-total .count {
+    font-size: clamp(56px, 12vw, 120px);
+    font-weight: var(--ag-fw-semi);
+    letter-spacing: -0.04em;
+    line-height: 0.95;
+    color: var(--ag-text-bright);
+    text-shadow: 0 0 40px rgba(91, 141, 239, 0.35);
+  }
+  .t-unit {
+    font-size: clamp(16px, 2.4vw, 22px);
+    color: var(--ag-muted);
+  }
+  .t-sub {
+    margin-top: 12px;
+    color: var(--ag-muted);
+    max-width: 56ch;
+  }
+  .bar {
+    display: flex;
+    gap: 3px;
+    height: 12px;
+    margin-top: 28px;
+    border-radius: var(--ag-radius-pill);
+    overflow: hidden;
+    clip-path: inset(0 100% 0 0 round 999px);
+    transition: clip-path 1.4s cubic-bezier(0.2, 0.8, 0.2, 1) 0.2s;
+  }
+  .tokens:global(.in) .bar {
+    clip-path: inset(0 0 0 0 round 999px);
+  }
+  .seg {
+    width: var(--w);
+    background: var(--c);
+    box-shadow: 0 0 14px color-mix(in srgb, var(--c) 60%, transparent);
+  }
+  .legend {
+    list-style: none;
+    padding: 0;
+    margin: 18px 0 0;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 10px 20px;
+  }
+  .legend li {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: var(--ag-fs-base);
+  }
+  .sw {
+    width: 10px;
+    height: 10px;
+    border-radius: 3px;
+    background: var(--c);
+    flex: none;
+  }
+  .lg-label {
+    color: var(--ag-text-2);
+  }
+  .lg-val {
+    margin-left: auto;
+    color: var(--ag-muted);
+  }
+
+  .tiles {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+    margin-top: 12px;
+  }
+  .tile {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    background: var(--ag-panel);
+    border: 1px solid var(--ag-border);
+    border-radius: var(--ag-radius-md);
+    padding: 18px 20px;
+  }
+  .tile-val {
+    font-size: clamp(26px, 4vw, 36px);
+    font-weight: var(--ag-fw-semi);
+    color: var(--ag-text-bright);
+    letter-spacing: -0.02em;
+  }
+  .tile-label {
+    color: var(--ag-muted);
+    font-size: var(--ag-fs-base);
+  }
+
+  @media (max-width: 720px) {
+    .legend {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .tiles {
+      grid-template-columns: 1fr 1fr;
+    }
+    .tile:first-child {
+      grid-column: span 2;
+    }
+  }
+</style>

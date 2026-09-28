@@ -8,7 +8,7 @@ interface Props {
 }
 const {
   title = `${site.name} · ${site.eyebrow}`,
-  description = site.tagline,
+  description = site.description,
 } = Astro.props;
 
 const canonical = new URL(Astro.url.pathname, Astro.site ?? `https://${site.domain}`);
@@ -39,5 +39,34 @@ const canonical = new URL(Astro.url.pathname, Astro.site ?? `https://${site.doma
   </head>
   <body>
     <slot />
+    <script>
+      // Scroll reveal: elements with .reveal fade up once when they enter.
+      const io = new IntersectionObserver(
+        (entries) =>
+          entries.forEach((e) => {
+            if (e.isIntersecting) {
+              e.target.classList.add('in');
+              io.unobserve(e.target);
+            }
+          }),
+        { rootMargin: '0px 0px -8% 0px', threshold: 0.08 },
+      );
+      document.querySelectorAll('.reveal').forEach((el) => io.observe(el));
+
+      // Spotlight: .spot surfaces get a soft glow that follows the pointer.
+      if (matchMedia('(hover: hover)').matches) {
+        document.addEventListener(
+          'pointermove',
+          (e) => {
+            const el = (e.target as Element | null)?.closest<HTMLElement>('.spot');
+            if (!el) return;
+            const r = el.getBoundingClientRect();
+            el.style.setProperty('--mx', `${e.clientX - r.left}px`);
+            el.style.setProperty('--my', `${e.clientY - r.top}px`);
+          },
+          { passive: true },
+        );
+      }
+    </script>
   </body>
 </html>

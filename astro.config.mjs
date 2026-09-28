@@ -8,4 +8,6 @@ export default defineConfig({
   site: 'https://tylerw.ai',
   output: 'static',
   prefetch: true,
+  // three.js (WebGPU build) is one lazy chunk loaded after first paint.
+  vite: { build: { chunkSizeWarningLimit: 1000 } },
 });

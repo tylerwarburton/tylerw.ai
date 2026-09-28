@@ -1,0 +1,107 @@
+---
+import { categories, projects, projectsByCategory, type CategoryKey } from '../data/projects';
+import ProjectCard from './ProjectCard.astro';
+import Icon from './Icon.astro';
+
+const featured = projects.filter((p) => p.featured);
+const keys = Object.keys(categories) as CategoryKey[];
+---
+
+<section class="section work" id="work">
+  <div class="container">
+    <div class="head reveal">
+      <div>
+        <p class="eyebrow">Selected work</p>
+        <h2 class="section-title">Products I've built and run.</h2>
+      </div>
+      <a class="btn btn-ghost" href="/projects">All {projects.length} projects <Icon name="arrow-right" size={16} /></a>
+    </div>
+
+    <div class="cats reveal">
+      {
+        keys.map((k) => (
+          <a class="cat spot" href={`/projects#${k}`}>
+            <span class="cat-n mono">{String(projectsByCategory(k).length).padStart(2, '0')}</span>
+            <span class="cat-label">{categories[k].label}</span>
+            <span class="cat-blurb">{categories[k].blurb}</span>
+          </a>
+        ))
+      }
+    </div>
+
+    <div class="grid">
+      {featured.map((p) => <div class="reveal"><ProjectCard project={p} /></div>)}
+    </div>
+  </div>
+</section>
+
+<style>
+  .head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    gap: 20px;
+    flex-wrap: wrap;
+  }
+  .section-title {
+    margin-top: 12px;
+  }
+  .cats {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+    margin-top: 32px;
+  }
+  .cat {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 20px;
+    border-radius: var(--ag-radius-md);
+    border: 1px solid var(--ag-border);
+    background: linear-gradient(160deg, var(--ag-panel-2), var(--ag-panel));
+    color: inherit;
+    overflow: hidden;
+    transition: border-color var(--ag-dur-base) var(--ag-ease);
+  }
+  .cat:hover {
+    text-decoration: none;
+    border-color: var(--ag-accent-50);
+  }
+  .cat-n {
+    font-size: 28px;
+    font-weight: var(--ag-fw-semi);
+    color: var(--ag-accent);
+  }
+  .cat-label {
+    font-size: 17px;
+    font-weight: var(--ag-fw-semi);
+    color: var(--ag-text-bright);
+  }
+  .cat-blurb {
+    font-size: var(--ag-fs-base);
+    color: var(--ag-muted);
+    line-height: 1.5;
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+    margin-top: 12px;
+  }
+  .grid > div {
+    display: grid;
+  }
+  @media (max-width: 900px) {
+    .grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+  @media (max-width: 720px) {
+    .cats,
+    .grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
