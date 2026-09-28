@@ -18,12 +18,12 @@ export const site = {
   cta: { label: 'Book a call', href: '#book' },
 
   // — AI token usage (lifetime, approximate) —————————————————
-  //   value is raw tokens. Edit as the numbers grow.
+  //   value is raw tokens, shown as "at least" (e.g. 400B+).
   tokens: {
     asOf: 'Sep 2026',
     sources: [
-      { key: 'claude', label: 'Claude', value: 400e9, color: '#d97757' }, // TODO: confirm, "hundreds of billions" across 4 accounts
-      { key: 'openai', label: 'OpenAI', value: 200e9, color: '#5b8def' }, // TODO: confirm, "hundreds of billions"
+      { key: 'claude', label: 'Claude', value: 400e9, color: '#d97757' },
+      { key: 'openai', label: 'OpenAI', value: 200e9, color: '#5b8def' },
       { key: 'openrouter', label: 'OpenRouter', value: 750e6, color: '#a78bfa' },
       { key: 'local', label: 'Local models', value: 300e6, color: '#4ade80' },
     ],
@@ -54,9 +54,9 @@ export const site = {
     },
     {
       name: 'American Technical Consultants',
-      role: 'Fractional CTO', // TODO: confirm title
-      years: '2026 to now', // TODO: confirm dates
-      note: 'Technology leadership and AI adoption.',
+      role: 'Fractional CTO',
+      years: 'Aug 2026 to now',
+      note: 'Leading technology strategy, engineering, and AI adoption.',
     },
     {
       name: 'Lockheed Martin',
@@ -110,8 +110,11 @@ export const site = {
   // — Contact / links ——————————————————————————————————————————
   email: 'tylerw9954@gmail.com',
   github: 'https://github.com/tylerwarburton',
+  linkedin: 'https://www.linkedin.com/in/tyler-warburton/',
+  linkedinSlug: 'tyler-warburton',
   socials: [
     { icon: 'linkedin', label: 'LinkedIn', href: 'https://www.linkedin.com/in/tyler-warburton/' },
+    { icon: 'x', label: 'X', href: 'https://x.com/tylerw_ai' },
     { icon: 'github', label: 'GitHub', href: 'https://github.com/tylerwarburton' },
   ],
 } as const;

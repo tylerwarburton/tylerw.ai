@@ -21,6 +21,15 @@ import Icon from './Icon.astro';
         </a>
         <a class="btn btn-ghost" href={site.cta.href}>{site.cta.label}</a>
       </div>
+      <nav class="socials reveal" aria-label="Elsewhere">
+        {
+          site.socials.map((s) => (
+            <a href={s.href} target="_blank" rel="noopener" aria-label={s.label} title={s.label}>
+              <Icon name={s.icon} size={18} />
+            </a>
+          ))
+        }
+      </nav>
     </div>
 
     <div class="portrait reveal">
@@ -133,6 +142,26 @@ import Icon from './Icon.astro';
     flex-wrap: wrap;
     gap: 12px;
     margin-top: 30px;
+  }
+
+  .socials {
+    display: flex;
+    gap: 6px;
+    margin-top: 22px;
+    margin-left: -8px;
+  }
+  .socials a {
+    display: inline-grid;
+    place-items: center;
+    width: 38px;
+    height: 38px;
+    border-radius: var(--ag-radius-sm);
+    color: var(--ag-muted);
+    transition: color var(--ag-dur-base) var(--ag-ease), background var(--ag-dur-base) var(--ag-ease);
+  }
+  .socials a:hover {
+    color: var(--ag-text-bright);
+    background: rgba(255, 255, 255, 0.05);
   }
 
   /* Portrait with a slowly turning signal ring */

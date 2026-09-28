@@ -22,18 +22,18 @@ const tiles = [
         <p class="t-asof mono">as of {site.tokens.asOf}</p>
       </div>
       <p class="t-total">
-        <span class="count mono" data-to={totalTokens} data-format="tokens">{compact(totalTokens)}</span>
+        <span class="count mono" data-to={totalTokens} data-format="tokens">{compact(totalTokens)}</span><span class="plus mono">+</span>
         <span class="t-unit">tokens</span>
       </p>
       <p class="t-sub">Across Claude, OpenAI, OpenRouter, and local models. This is how I work: AI in every loop.</p>
 
-      <div class="bar" role="img" aria-label={sources.map((s) => `${s.label} ${compact(s.value)}`).join(', ')}>
+      <div class="bar" role="img" aria-label={sources.map((s) => `${s.label} over ${compact(s.value)}`).join(', ')}>
         {
           sources.map((s) => (
             <span
               class="seg"
               style={`--w:${Math.max((s.value / totalTokens) * 100, 0.8)}%;--c:${s.color}`}
-              title={`${s.label}: ${compact(s.value)}`}
+              title={`${s.label}: ${compact(s.value)}+`}
             />
           ))
         }
@@ -44,7 +44,7 @@ const tiles = [
             <li>
               <span class="sw" style={`--c:${s.color}`} />
               <span class="lg-label">{s.label}</span>
-              <span class="lg-val mono">{compact(s.value)}</span>
+              <span class="lg-val mono">{compact(s.value)}+</span>
             </li>
           ))
         }
@@ -131,6 +131,13 @@ const tiles = [
     line-height: 0.95;
     color: var(--ag-text-bright);
     text-shadow: 0 0 40px rgba(91, 141, 239, 0.35);
+  }
+  .plus {
+    font-size: clamp(36px, 7vw, 72px);
+    font-weight: var(--ag-fw-semi);
+    color: var(--ag-accent);
+    line-height: 0.95;
+    margin-left: -4px;
   }
   .t-unit {
     font-size: clamp(16px, 2.4vw, 22px);
