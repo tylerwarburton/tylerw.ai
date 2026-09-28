@@ -4,6 +4,7 @@ import Nav from '../../components/Nav.astro';
 import Footer from '../../components/Footer.astro';
 import Icon from '../../components/Icon.astro';
 import ProjectCard from '../../components/ProjectCard.astro';
+import ProjectLogo from '../../components/ProjectLogo.astro';
 import { categories, projects, type Project } from '../../data/projects';
 import { site } from '../../data/site';
 
@@ -20,8 +21,9 @@ const next = projects[(i + 1) % projects.length];
 <Base title={`${p.name} · ${site.name}`} description={p.summary}>
   <Nav />
   <main>
-    <article class="project">
+    <article class="project" style={p.brand ? `--brand:${p.brand.color}` : undefined}>
       <div class="grid-bg"></div>
+      <div class="brand-glow" aria-hidden="true"></div>
       <div class="container narrow">
         <a class="back reveal" href={`/projects#${p.category}`}>← {categories[p.category].label}</a>
 
@@ -31,7 +33,10 @@ const next = projects[(i + 1) % projects.length];
             <span class:list={['chip mono status', p.status.toLowerCase().replace(' ', '-')]}>{p.status}</span>
             <span class="chip mono">{p.years}</span>
           </div>
-          <h1 class="name">{p.name}</h1>
+          <div class="title-row">
+            <ProjectLogo project={p} size={64} />
+            <h1 class="name">{p.name}</h1>
+          </div>
           <p class="tagline">{p.tagline}</p>
         </header>
 
@@ -102,11 +107,33 @@ const next = projects[(i + 1) % projects.length];
 
 <style>
   .project {
+    --brand: var(--ag-accent);
     position: relative;
     overflow: hidden;
     padding-block: clamp(40px, 7vw, 88px) clamp(32px, 5vw, 56px);
   }
+  .brand-glow {
+    position: absolute;
+    inset: -20% -10% auto;
+    height: 520px;
+    background: radial-gradient(
+      ellipse 50% 60% at 30% 30%,
+      color-mix(in srgb, var(--brand) 16%, transparent),
+      transparent 70%
+    );
+    pointer-events: none;
+  }
+  .title-row {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    margin-top: 18px;
+  }
+  .title-row .name {
+    margin-top: 0;
+  }
   .narrow {
+    position: relative;
     max-width: 780px;
   }
   .back {

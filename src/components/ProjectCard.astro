@@ -2,6 +2,7 @@
 import type { Project } from '../data/projects';
 import { categories } from '../data/projects';
 import Icon from './Icon.astro';
+import ProjectLogo from './ProjectLogo.astro';
 
 interface Props {
   project: Project;
@@ -9,9 +10,17 @@ interface Props {
 const { project: p } = Astro.props;
 ---
 
-<a class="pcard spot" href={`/projects/${p.slug}`} data-cat={p.category}>
+<a
+  class:list={['pcard spot', { branded: !!p.brand }]}
+  href={`/projects/${p.slug}`}
+  data-cat={p.category}
+  style={p.brand ? `--brand:${p.brand.color}` : undefined}
+>
   <div class="pc-top">
-    <span class="pc-cat mono">{categories[p.category].short}</span>
+    <span class="pc-id">
+      <ProjectLogo project={p} size={34} />
+      <span class="pc-cat mono">{categories[p.category].short}</span>
+    </span>
     <span class:list={['pc-status mono', p.status.toLowerCase().replace(' ', '-')]}>{p.status}</span>
   </div>
   <h3 class="pc-name">{p.name}</h3>
@@ -44,6 +53,37 @@ const { project: p } = Astro.props;
     text-decoration: none;
     border-color: var(--ag-accent-50);
     transform: translateY(-2px);
+  }
+  /* Brand edge: a thin line of the product's own colour along the top */
+  .pcard.branded::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--brand), transparent);
+    opacity: 0.7;
+    transition: opacity var(--ag-dur-base) var(--ag-ease);
+  }
+  .pcard.branded:hover {
+    border-color: color-mix(in srgb, var(--brand) 45%, transparent);
+    box-shadow: 0 18px 40px -24px color-mix(in srgb, var(--brand) 60%, transparent);
+  }
+  .pcard.branded:hover::after {
+    opacity: 1;
+  }
+  .pcard.branded::before {
+    background: radial-gradient(
+      360px circle at var(--mx, 50%) var(--my, 50%),
+      color-mix(in srgb, var(--brand) 14%, transparent),
+      transparent 60%
+    );
+  }
+  .pc-id {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
   }
   .pc-top {
     display: flex;
