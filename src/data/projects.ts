@@ -57,7 +57,7 @@ export const projects: Project[] = [
     tagline: 'LinkedIn growth on autopilot, with a paid research marketplace.',
     summary:
       'A desktop app that automates LinkedIn outreach and growth for founders and sales teams. It includes a marketplace where customers buy AI research briefs on leads, markets, and companies.',
-    role: 'Founder & lead engineer',
+    role: 'CTO & lead engineer',
     involvement:
       'Built the product from the first commit: the desktop app, the server, billing, and the research worker fleet that fulfils briefs.',
     stack: ['TypeScript', 'Electron', 'Node', 'Postgres', 'Docker'],
@@ -88,10 +88,9 @@ export const projects: Project[] = [
     slug: 'heyhauler',
     name: 'HeyHauler',
     category: 'ai',
-    tagline: 'Operations software for roll-off and junk-hauling companies.',
-    summary:
-      'Runs a hauling business end to end: bin orders, drivers and shifts, yards and disposal, scale tickets, invoicing, and payments, all multi-tenant. Crews work from their phones and owners see the whole book in one console.',
-    role: 'Founder & lead engineer',
+    tagline: 'SaaS for hauling businesses: dumpsters, jobs, and clients.',
+    summary: 'Software for companies that haul things, like roll-off dumpsters: orders, drivers, yards, disposal, invoicing, and payments. Clients request and track their jobs in the same system the crew runs on.',
+    role: 'CTO & lead engineer',
     involvement:
       'Built the platform, the design system, the multi-org model, and an AI simulation that drives a live business day against the real app.',
     stack: ['Next.js', 'TypeScript', 'Postgres', 'Drizzle', 'Docker'],
@@ -105,10 +104,9 @@ export const projects: Project[] = [
     slug: 'breederops',
     name: 'BreederOps',
     category: 'ai',
-    tagline: 'Colony and breeding management you can run by voice.',
-    summary:
-      'Management software for animal breeding operations: racks and tubs, breeders and harems, litters, grow-outs, health, and mortality. Owners walk the room and talk, and the AI turns what they say into records they confirm.',
-    role: 'Founder & lead engineer',
+    tagline: 'The all-in-one manager for animal breeding operations.',
+    summary: 'Management software for agricultural animal raising, starting with rodents bred for pets and reptile food: racks, breeders, litters, health, and output. Incubator tracking for reptiles and support for dog breeders are next, so it becomes the one place to run any breeding operation.',
+    role: 'CTO & lead engineer',
     involvement:
       'Built the colony model, the voice console, and the guided check-in walk where the AI only asks about what you have not already said.',
     stack: ['Next.js', 'TypeScript', 'Postgres', 'Claude'],
@@ -124,7 +122,7 @@ export const projects: Project[] = [
     tagline: 'Live team quizzes built into your slide deck.',
     summary:
       'A presentation platform where the audience joins teams by QR code and competes on speed and accuracy in real time. Presenters build decks in an admin studio with several question types and printable team labels.',
-    role: 'Founder & lead engineer',
+    role: 'CTO & lead engineer',
     involvement: 'Built it from the initial scaffold: real-time engine, studio, and deployment.',
     stack: ['Next.js', 'Socket.IO', 'Redis', 'Prisma', 'Postgres'],
     years: '2026 to now',
@@ -158,7 +156,7 @@ export const projects: Project[] = [
     tagline: 'Decentralized, verifiable randomness for AO.',
     summary:
       'A randomness protocol where a network of providers commits and reveals entropy, backed by a verifiable delay function, so apps on AO get random numbers nobody can rig. It includes the RAND token, a provider network, a JavaScript SDK, and dashboards.',
-    role: 'Co-founder & CTO',
+    role: 'CTO',
     involvement:
       'Led the technology: the provider node, the SDK, the dashboards, the docs, and the hardware miner program.',
     stack: ['Lua', 'TypeScript', 'Go', 'Docker', 'AO'],
@@ -193,16 +191,16 @@ export const projects: Project[] = [
     slug: 'opportunity',
     name: 'Opportunity',
     category: 'crypto',
-    tagline: 'Collateral-backed options on Robinhood Chain.',
-    summary:
-      'An options platform where issuers lock ERC-20 collateral and mint a transferable NFT option right. It is live on Robinhood Chain testnet.',
-    role: 'Lead engineer',
-    involvement: 'Building the contracts, tests, and issuing app.',
+    tagline: 'Options contracts on tokenized stocks, on Robinhood Chain.',
+    summary: 'An options platform for tokenized stocks on Robinhood Chain. Issuers lock collateral and mint transferable option contracts that anyone can trade, exercise, or let expire.',
+    role: 'Technical lead',
+    involvement: 'Lead the technical side: the collateral-backed options contracts, their test suite, and the issuing app.',
     stack: ['Solidity', 'Foundry', 'OpenZeppelin'],
     years: '2026',
     status: 'Testnet',
     company: 'CipherPlay',
     links: [
+      { label: 'opportunitytrade.com', href: 'https://opportunitytrade.com' },
       { label: 'App', href: 'https://app.opportunitytrade.com' },
       { label: 'Contracts', href: 'https://github.com/CipherPlayLabs/opportunity-options-contracts' },
     ],

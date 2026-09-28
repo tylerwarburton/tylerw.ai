@@ -7,12 +7,12 @@ export const site = {
   // — Identity ————————————————————————————————————————————————
   name: 'Tyler Warburton',
   domain: 'tylerw.ai',
-  eyebrow: 'Founder · Fractional CTO',
+  eyebrow: 'Fractional CTO · AI & Security',
   headline: 'I build companies with AI.',
   tagline:
-    'Founder of CipherPlay and co-founder of RandAO. I ship SaaS, crypto protocols, and hardware, and I step in as a fractional CTO for teams that need to move fast.',
+    'I help companies adopt AI securely. CTO at ATC, AutoGrow, CipherPlay, and RandAO, ex-Lockheed Martin. I ship SaaS, crypto protocols, and hardware.',
   description:
-    'Tyler Warburton: founder and fractional CTO. AI, SaaS, crypto, and hardware products, shipped.',
+    'Tyler Warburton: fractional CTO helping companies adopt AI securely. CTO at ATC, AutoGrow, CipherPlay, and RandAO. Ex-Lockheed Martin.',
 
   // — Primary call to action —————————————————————————————————
   cta: { label: 'Book a call', href: '#book' },
@@ -35,14 +35,14 @@ export const site = {
   companies: [
     {
       name: 'American Technical Consultants',
-      role: 'Fractional CTO',
+      role: 'CTO (Fractional)',
       start: 'Aug 2026',
       end: '',
-      note: 'Leading technology strategy, engineering, and AI adoption.',
+      note: 'Leading technology strategy, engineering, and secure AI adoption.',
     },
     {
       name: 'AutoGrow',
-      role: 'Founder',
+      role: 'CTO',
       start: 'Mar 2026',
       end: '',
       href: 'https://github.com/CipherPlayLabs/Auto-Grow-releases',
@@ -50,15 +50,15 @@ export const site = {
     },
     {
       name: 'CipherPlay',
-      role: 'Founder',
+      role: 'CTO & Co-Founder',
       start: '2024',
       end: '',
       href: 'https://cipherplay.net',
-      note: 'Cybersecurity, blockchain, and AI studio. Home of HeyHauler, BreederOps, Paralith, and Opportunity.',
+      note: 'Building secure, fair systems for the modern web. Home of HeyHauler, BreederOps, Paralith, and Opportunity.',
     },
     {
       name: 'RandAO',
-      role: 'Co-founder & CTO',
+      role: 'CTO',
       start: '2024',
       end: '',
       href: 'https://randao.net',
@@ -66,24 +66,24 @@ export const site = {
     },
     {
       name: 'Lockheed Martin',
-      role: 'Senior Software Engineer',
+      role: 'Senior Software Developer',
       start: '',
       end: '',
-      note: 'Led cybersecurity work on critical programs.',
+      note: 'Led DevSecOps on mission-critical defense systems with the U.S. Navy.',
     },
     {
       name: 'Lockheed Martin',
-      role: 'Program Management',
+      role: 'Software Engineering Intern',
       start: '',
       end: '',
-      note: 'Ran complex technical programs end to end.',
+      note: 'Where it started: intern to senior developer.',
     },
   ],
 
   // — Public work: talks, education, community ——————————————
   speaking: {
     intro:
-      'I give talks and run hands-on education sessions on getting real work done with AI, for business leaders, builders, and anyone ready to move faster.',
+      'I speak about AI around Richmond and teach people to use it well: what is real, what is hype, and where the security risks are. For business leaders, builders, and teams.',
     items: [
       {
         kind: 'Talk',
