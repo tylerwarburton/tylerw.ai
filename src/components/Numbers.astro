@@ -2,6 +2,7 @@
 import { site, compact } from '../data/site';
 import { projects } from '../data/projects';
 import { getGithubStats } from '../data/github';
+import { experience } from '../data/experience';
 
 const gh = await getGithubStats();
 const sources = [...site.tokens.sources].sort((a, b) => b.value - a.value);
@@ -10,7 +11,7 @@ const totalTokens = sources.reduce((a, s) => a + s.value, 0);
 const tiles = [
   { value: gh.total, label: 'commits shipped', suffix: '+' },
   { value: projects.length, label: 'products built', suffix: '' },
-  { value: site.companies.length, label: 'companies', suffix: '' },
+  { value: experience.length, label: 'companies', suffix: '' },
 ];
 ---
 

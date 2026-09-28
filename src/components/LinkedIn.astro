@@ -1,38 +1,18 @@
 ---
 import { site } from '../data/site';
-import { positions } from '../data/linkedin';
 import Icon from './Icon.astro';
+
+interface Props {
+  synced?: boolean;
+}
+const { synced = false } = Astro.props;
 ---
 
 <div class="li reveal" id="linkedin">
-  {
-    positions.length > 0 && (
-      <ol class="timeline">
-        {positions.map((p) => (
-          <li>
-            <span class="when mono">
-              {p.start}
-              {' – '}
-              {p.end || 'Present'}
-            </span>
-            <span class="what">
-              <span class="t">{p.title}</span>
-              <span class="c">
-                {p.company}
-                {p.location && <span class="loc"> · {p.location}</span>}
-              </span>
-              {p.description && <span class="d">{p.description}</span>}
-            </span>
-          </li>
-        ))}
-      </ol>
-    )
-  }
-
   <div class="li-card">
     <div class="li-copy">
       <p class="eyebrow">Full history</p>
-      <p class="li-text">Every role, recommendation, and post lives on LinkedIn.</p>
+      <p class="li-text">{synced ? 'Synced from my LinkedIn. Recommendations and posts live there too.' : 'Every role, recommendation, and post lives on LinkedIn.'}</p>
       <a class="btn btn-ghost" href={site.linkedin} target="_blank" rel="noopener">
         <Icon name="linkedin" size={16} /> View LinkedIn <Icon name="arrow-up-right" size={14} />
       </a>
@@ -77,50 +57,6 @@ import Icon from './Icon.astro';
     display: grid;
     gap: 12px;
   }
-  .timeline {
-    list-style: none;
-    margin: 0;
-    padding: 8px 20px;
-    border: 1px solid var(--ag-border);
-    border-radius: var(--ag-radius-lg);
-    background: var(--ag-panel);
-  }
-  .timeline li {
-    display: grid;
-    grid-template-columns: 170px 1fr;
-    gap: 16px;
-    padding: 14px 0;
-  }
-  .timeline li + li {
-    border-top: 1px solid var(--ag-border);
-  }
-  .when {
-    font-size: var(--ag-fs-small);
-    color: var(--ag-muted);
-    padding-top: 2px;
-  }
-  .what {
-    display: flex;
-    flex-direction: column;
-    gap: 3px;
-  }
-  .t {
-    color: var(--ag-text-bright);
-    font-weight: var(--ag-fw-semi);
-  }
-  .c {
-    color: #9fc0ff;
-    font-size: var(--ag-fs-base);
-  }
-  .loc {
-    color: var(--ag-muted);
-  }
-  .d {
-    color: var(--ag-muted);
-    font-size: var(--ag-fs-base);
-    white-space: pre-line;
-    margin-top: 4px;
-  }
   .li-card {
     display: flex;
     align-items: center;
@@ -144,11 +80,5 @@ import Icon from './Icon.astro';
   .badge-wrap {
     max-width: 100%;
     overflow: hidden;
-  }
-  @media (max-width: 600px) {
-    .timeline li {
-      grid-template-columns: 1fr;
-      gap: 4px;
-    }
   }
 </style>
