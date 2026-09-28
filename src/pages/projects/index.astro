@@ -1,0 +1,163 @@
+---
+import Base from '../../layouts/Base.astro';
+import Nav from '../../components/Nav.astro';
+import Footer from '../../components/Footer.astro';
+import ProjectCard from '../../components/ProjectCard.astro';
+import { categories, projects, projectsByCategory, type CategoryKey } from '../../data/projects';
+import { site } from '../../data/site';
+
+const keys = Object.keys(categories) as CategoryKey[];
+---
+
+<Base title={`Projects · ${site.name}`} description={`${projects.length} products across AI, SaaS, crypto, and hardware, built by ${site.name}.`}>
+  <Nav />
+  <main>
+    <section class="page-head">
+      <div class="grid-bg"></div>
+      <div class="container">
+        <p class="eyebrow reveal">Projects</p>
+        <h1 class="title reveal">Everything I've built.</h1>
+        <p class="sub reveal">
+          {projects.length} products across {keys.length} industries. I helped design, build, and run every one of them.
+        </p>
+        <nav class="filters reveal" aria-label="Filter by industry">
+          <button class="chip active" data-filter="all" aria-pressed="true">All <span class="mono">{projects.length}</span></button>
+          {
+            keys.map((k) => (
+              <button class="chip" data-filter={k} aria-pressed="false">
+                {categories[k].short} <span class="mono">{projectsByCategory(k).length}</span>
+              </button>
+            ))
+          }
+        </nav>
+      </div>
+    </section>
+
+    {
+      keys.map((k) => (
+        <section class="cat-section" id={k} data-cat={k}>
+          <div class="container">
+            <div class="cat-head reveal">
+              <h2 class="section-title">{categories[k].label}</h2>
+              <p class="cat-blurb">{categories[k].blurb}</p>
+            </div>
+            <div class="grid">
+              {projectsByCategory(k).map((p) => (
+                <div class="reveal">
+                  <ProjectCard project={p} />
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      ))
+    }
+  </main>
+  <Footer />
+</Base>
+
+<script>
+  const chips = document.querySelectorAll<HTMLButtonElement>('.chip');
+  const sections = document.querySelectorAll<HTMLElement>('.cat-section');
+  const apply = (f: string) => {
+    chips.forEach((c) => {
+      const on = c.dataset.filter === f;
+      c.classList.toggle('active', on);
+      c.setAttribute('aria-pressed', String(on));
+    });
+    sections.forEach((s) => (s.hidden = f !== 'all' && s.dataset.cat !== f));
+  };
+  chips.forEach((c) => c.addEventListener('click', () => apply(c.dataset.filter!)));
+  const hash = location.hash.slice(1);
+  if (hash && document.querySelector(`.chip[data-filter="${hash}"]`)) apply(hash);
+</script>
+
+<style>
+  .page-head {
+    position: relative;
+    overflow: hidden;
+    padding-block: clamp(56px, 9vw, 104px) clamp(24px, 4vw, 40px);
+  }
+  .title {
+    font-size: clamp(36px, 6vw, 60px);
+    font-weight: var(--ag-fw-semi);
+    letter-spacing: -0.03em;
+    color: var(--ag-text-bright);
+    margin-top: 14px;
+    line-height: 1.05;
+  }
+  .sub {
+    margin-top: 14px;
+    color: var(--ag-muted);
+    max-width: 56ch;
+    font-size: clamp(15px, 1.8vw, 17px);
+  }
+  .filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 28px;
+  }
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font: inherit;
+    font-size: var(--ag-fs-base);
+    color: var(--ag-text-2);
+    background: var(--ag-panel);
+    border: 1px solid var(--ag-border-2);
+    border-radius: var(--ag-radius-pill);
+    padding: 8px 14px;
+    cursor: pointer;
+    transition: all var(--ag-dur-base) var(--ag-ease);
+  }
+  .chip .mono {
+    color: var(--ag-muted);
+    font-size: var(--ag-fs-small);
+  }
+  .chip:hover {
+    border-color: var(--ag-accent-50);
+  }
+  .chip.active {
+    background: var(--ag-accent-12);
+    border-color: var(--ag-accent);
+    color: var(--ag-text-bright);
+  }
+  .cat-section {
+    padding-block: clamp(28px, 5vw, 56px);
+    scroll-margin-top: 64px;
+  }
+  .cat-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px 24px;
+    flex-wrap: wrap;
+    border-bottom: 1px solid var(--ag-border);
+    padding-bottom: 14px;
+  }
+  .cat-blurb {
+    color: var(--ag-muted);
+    max-width: 52ch;
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+    margin-top: 20px;
+  }
+  .grid > div {
+    display: grid;
+  }
+  @media (max-width: 900px) {
+    .grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+  @media (max-width: 600px) {
+    .grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

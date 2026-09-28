@@ -2,23 +2,24 @@
 import { site } from '../data/site';
 
 const links = [
-  { href: '#work', label: 'What I do' },
-  { href: '#about', label: 'About' },
-  { href: '#experience', label: 'Background' },
-  { href: '#book', label: 'Work with me' },
+  { href: '/projects', label: 'Projects' },
+  { href: '/#companies', label: 'Companies' },
+  { href: '/#activity', label: 'Activity' },
+  { href: '/#speaking', label: 'Speaking' },
 ];
+const ctaHref = `/${site.cta.href}`;
 ---
 
 <header class="nav" id="nav">
   <div class="container nav-inner">
-    <a class="brand" href="#top">
+    <a class="brand" href="/">
       <span class="dot" aria-hidden="true"></span>
       <span class="brand-name">{site.name}</span>
     </a>
 
     <nav class="links" aria-label="Primary">
       {links.map((l) => <a href={l.href}>{l.label}</a>)}
-      <a class="btn btn-primary nav-cta" href={site.cta.href}>{site.cta.label}</a>
+      <a class="btn btn-primary nav-cta" href={ctaHref}>{site.cta.label}</a>
     </nav>
 
     <button class="menu-btn" id="menuBtn" aria-label="Menu" aria-expanded="false" aria-controls="mobileMenu">
@@ -30,7 +31,7 @@ const links = [
 
   <div class="mobile-menu" id="mobileMenu">
     {links.map((l) => <a href={l.href} class="m-link">{l.label}</a>)}
-    <a class="btn btn-primary m-cta" href={site.cta.href}>{site.cta.label}</a>
+    <a class="btn btn-primary m-cta" href={ctaHref}>{site.cta.label}</a>
     <a class="btn btn-ghost m-cta" href={site.group.href} target="_blank" rel="noopener">
       {site.group.label}
     </a>

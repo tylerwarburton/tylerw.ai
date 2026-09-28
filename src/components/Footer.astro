@@ -11,7 +11,8 @@ import Icon from './Icon.astro';
     </div>
 
     <nav class="foot-nav" aria-label="Footer">
-      <a class="txt" href={site.cta.href}>{site.cta.label}</a>
+      <a class="txt" href="/projects">Projects</a>
+      <a class="txt" href={`/${site.cta.href}`}>{site.cta.label}</a>
       <a class="txt" href={site.group.href} target="_blank" rel="noopener">{site.group.name}</a>
       {
         site.socials.map((s) => (
@@ -51,7 +52,17 @@ import Icon from './Icon.astro';
   .foot-nav {
     display: flex;
     align-items: center;
-    gap: 10px;
+    flex-wrap: wrap;
+    gap: 6px 10px;
+  }
+  @media (max-width: 640px) {
+    .footer-inner {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+    .foot-nav {
+      margin-left: -8px;
+    }
   }
   .txt {
     color: var(--ag-muted);

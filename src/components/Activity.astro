@@ -1,0 +1,185 @@
+---
+import { getGithubStats } from '../data/github';
+import { site } from '../data/site';
+import Icon from './Icon.astro';
+
+const gh = await getGithubStats();
+const months = gh.months;
+const max = Math.max(...months.map((m) => m.count));
+const peak = months.reduce((a, b) => (b.count > a.count ? b : a));
+const label = (m: string) =>
+  new Date(`${m}-01T00:00:00Z`).toLocaleString('en-US', { month: 'short', timeZone: 'UTC' });
+const orgs = Object.entries(gh.byOrg).sort((a, b) => b[1] - a[1]);
+
+// SVG geometry (viewBox units; scales to container width)
+const H = 180;
+const gap = 4;
+const bw = 22;
+const W = months.length * (bw + gap) - gap;
+---
+
+<section class="section activity" id="activity">
+  <div class="container">
+    <div class="head reveal">
+      <p class="eyebrow">Shipping cadence</p>
+      <h2 class="section-title">{gh.total.toLocaleString('en-US')} commits since late 2024.</h2>
+      <p class="sub">
+        Every month across my own repos and the companies I build with, public and private. Peak: {
+          peak.count
+        } commits in {label(peak.month)} {peak.month.slice(0, 4)}.
+      </p>
+    </div>
+
+    <div class="chart-card reveal">
+      <svg class="chart" viewBox={`0 0 ${W} ${H + 22}`} role="img" aria-label="Commits per month">
+        <defs>
+          <linearGradient id="barGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#9fc0ff" />
+            <stop offset="1" stop-color="#5b8def" stop-opacity="0.35" />
+          </linearGradient>
+        </defs>
+        {
+          months.map((m, i) => {
+            const h = Math.max((m.count / max) * H, m.count ? 2 : 0);
+            const x = i * (bw + gap);
+            return (
+              <g class="col" style={`--i:${i}`}>
+                <rect class="track" x={x} y={0} width={bw} height={H} rx="3" />
+                <rect class="bar" x={x} y={H - h} width={bw} height={h} rx="3" fill="url(#barGrad)">
+                  <title>{`${label(m.month)} ${m.month.slice(0, 4)}: ${m.count} commits`}</title>
+                </rect>
+                {m.month.endsWith('-01') && (
+                  <text x={x} y={H + 16} class="yr">
+                    {m.month.slice(0, 4)}
+                  </text>
+                )}
+              </g>
+            );
+          })
+        }
+      </svg>
+
+      <ul class="orgs">
+        {
+          orgs.map(([name, n]) => (
+            <li>
+              <span class="org-name">{name}</span>
+              <span class="org-bar" style={`--w:${(n / gh.total) * 100}%`} />
+              <span class="org-n mono">{n.toLocaleString('en-US')}</span>
+            </li>
+          ))
+        }
+      </ul>
+
+      <a class="gh-link" href={site.github} target="_blank" rel="noopener">
+        <Icon name="github" size={16} /> github.com/{gh.login}
+        <Icon name="arrow-up-right" size={14} />
+      </a>
+    </div>
+  </div>
+</section>
+
+<style>
+  .head {
+    max-width: 640px;
+  }
+  .section-title {
+    margin-top: 12px;
+  }
+  .sub {
+    margin-top: 12px;
+    color: var(--ag-muted);
+  }
+  .chart-card {
+    margin-top: 28px;
+    background: var(--ag-well);
+    border: 1px solid var(--ag-border);
+    border-radius: var(--ag-radius-lg);
+    padding: clamp(16px, 3vw, 28px);
+  }
+  .chart {
+    display: block;
+    width: 100%;
+    height: auto;
+    overflow: visible;
+  }
+  .track {
+    fill: rgba(91, 141, 239, 0.05);
+  }
+  .bar {
+    transform-box: fill-box;
+    transform-origin: bottom;
+    transform: scaleY(0);
+    transition: transform 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) calc(var(--i) * 30ms);
+  }
+  .chart-card:global(.in) .bar {
+    transform: scaleY(1);
+  }
+  .col:hover .bar {
+    filter: brightness(1.3) drop-shadow(0 0 6px rgba(91, 141, 239, 0.8));
+  }
+  .yr {
+    fill: var(--ag-muted);
+    font-family: var(--ag-font-mono);
+    font-size: 11px;
+  }
+
+  .orgs {
+    list-style: none;
+    padding: 0;
+    margin: 24px 0 0;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px 32px;
+  }
+  .orgs li {
+    display: grid;
+    grid-template-columns: 130px 1fr auto;
+    align-items: center;
+    gap: 12px;
+    font-size: var(--ag-fs-base);
+  }
+  .org-name {
+    color: var(--ag-text-2);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .org-bar {
+    height: 6px;
+    border-radius: 999px;
+    background: linear-gradient(90deg, var(--ag-accent) var(--w), var(--ag-border) var(--w));
+  }
+  .org-n {
+    color: var(--ag-muted);
+    min-width: 4ch;
+    text-align: right;
+  }
+  .gh-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 22px;
+    font-size: var(--ag-fs-base);
+    color: var(--ag-text-2);
+  }
+  .gh-link:hover {
+    color: var(--ag-accent);
+    text-decoration: none;
+  }
+
+  @media (max-width: 720px) {
+    .orgs {
+      grid-template-columns: 1fr;
+    }
+    .orgs li {
+      grid-template-columns: 110px 1fr auto;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .bar {
+      transition: none;
+      transform: none;
+    }
+  }
+</style>

@@ -1,40 +1,22 @@
 ---
 import { site } from '../data/site';
-import Icon from './Icon.astro';
-const { cal, group, cta } = site;
+const { cal, cta } = site;
 ---
 
 <section class="section book" id="book">
   <div class="container">
     <div class="head">
       <p class="eyebrow">Work with me</p>
-      <h2 class="section-title">Get more done with AI.</h2>
-      <p class="sub">Two ways in: a private group of motivated people, or close 1:1 work.</p>
-    </div>
-
-    <!-- Group push -->
-    <div class="group-card">
-      <div class="grid-bg"></div>
-      <div class="group-inner">
-        <div class="group-copy">
-          <span class="tag mono">private group</span>
-          <h3 class="group-name">{group.name}</h3>
-          <p class="group-blurb">{group.blurb}</p>
-        </div>
-        <a class="btn btn-primary group-btn" href={group.href} target="_blank" rel="noopener">
-          <Icon name="users" size={18} />
-          {group.label}
-          <Icon name="arrow-up-right" size={16} />
-        </a>
-      </div>
+      <h2 class="section-title">Need a CTO who ships?</h2>
+      <p class="sub">Fractional CTO work, technical advisory, and AI workshops for your team. Grab a time and tell me what you are building.</p>
     </div>
 
     <!-- 1:1 booking embed -->
     <div class="one-on-one">
       <div class="oo-head">
-        <span class="tag mono">1:1</span>
+        <span class="tag mono">30 min intro</span>
         <h3 class="oo-title">{cta.label}</h3>
-        <p class="oo-sub">Pick a time below. We'll work through your real workflow together.</p>
+        <p class="oo-sub">Pick a time below. Or email <a href={`mailto:${site.email}`}>{site.email}</a>.</p>
       </div>
       <div id="cal-inline" class="cal-embed"></div>
       <noscript>
@@ -107,40 +89,6 @@ const { cal, group, cta } = site;
     padding: 4px 10px;
   }
 
-  /* Group card */
-  .group-card {
-    position: relative;
-    overflow: hidden;
-    background: var(--ag-panel);
-    border: 1px solid var(--ag-border);
-    border-radius: var(--ag-radius-lg);
-    padding: clamp(24px, 4vw, 40px);
-  }
-  .group-inner {
-    position: relative;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 28px;
-  }
-  .group-name {
-    font-size: clamp(22px, 3vw, 30px);
-    font-weight: var(--ag-fw-semi);
-    color: var(--ag-text-bright);
-    letter-spacing: -0.015em;
-    margin: 12px 0 0;
-  }
-  .group-blurb {
-    margin-top: 10px;
-    color: var(--ag-muted);
-    max-width: 52ch;
-    line-height: 1.55;
-  }
-  .group-btn {
-    flex: none;
-    white-space: nowrap;
-  }
-
   /* 1:1 embed */
   .one-on-one {
     margin-top: 16px;
@@ -171,15 +119,6 @@ const { cal, group, cta } = site;
   }
 
   @media (max-width: 720px) {
-    .group-inner {
-      flex-direction: column;
-      align-items: flex-start;
-      gap: 20px;
-    }
-    .group-btn {
-      width: 100%;
-      justify-content: center;
-    }
     .cal-embed {
       min-height: 620px;
     }

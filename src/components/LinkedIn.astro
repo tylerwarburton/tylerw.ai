@@ -1,0 +1,154 @@
+---
+import { site } from '../data/site';
+import { positions } from '../data/linkedin';
+import Icon from './Icon.astro';
+---
+
+<div class="li reveal" id="linkedin">
+  {
+    positions.length > 0 && (
+      <ol class="timeline">
+        {positions.map((p) => (
+          <li>
+            <span class="when mono">
+              {p.start}
+              {' – '}
+              {p.end || 'Present'}
+            </span>
+            <span class="what">
+              <span class="t">{p.title}</span>
+              <span class="c">
+                {p.company}
+                {p.location && <span class="loc"> · {p.location}</span>}
+              </span>
+              {p.description && <span class="d">{p.description}</span>}
+            </span>
+          </li>
+        ))}
+      </ol>
+    )
+  }
+
+  <div class="li-card">
+    <div class="li-copy">
+      <p class="eyebrow">Full history</p>
+      <p class="li-text">Every role, recommendation, and post lives on LinkedIn.</p>
+      <a class="btn btn-ghost" href={site.linkedin} target="_blank" rel="noopener">
+        <Icon name="linkedin" size={16} /> View LinkedIn <Icon name="arrow-up-right" size={14} />
+      </a>
+    </div>
+    <!-- Official LinkedIn profile badge; the script is only fetched when this scrolls near. -->
+    <div class="badge-wrap" data-li-badge>
+      <div
+        class="badge-base LI-profile-badge"
+        data-locale="en_US"
+        data-size="large"
+        data-theme="dark"
+        data-type="HORIZONTAL"
+        data-vanity={site.linkedinSlug}
+        data-version="v1"
+      >
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const slot = document.querySelector('[data-li-badge]');
+  if (slot) {
+    const io = new IntersectionObserver(
+      ([e]) => {
+        if (!e.isIntersecting) return;
+        io.disconnect();
+        const s = document.createElement('script');
+        s.src = 'https://platform.linkedin.com/badges/js/profile.js';
+        s.async = true;
+        document.body.appendChild(s);
+      },
+      { rootMargin: '400px' },
+    );
+    io.observe(slot);
+  }
+</script>
+
+<style>
+  .li {
+    margin-top: 12px;
+    display: grid;
+    gap: 12px;
+  }
+  .timeline {
+    list-style: none;
+    margin: 0;
+    padding: 8px 20px;
+    border: 1px solid var(--ag-border);
+    border-radius: var(--ag-radius-lg);
+    background: var(--ag-panel);
+  }
+  .timeline li {
+    display: grid;
+    grid-template-columns: 170px 1fr;
+    gap: 16px;
+    padding: 14px 0;
+  }
+  .timeline li + li {
+    border-top: 1px solid var(--ag-border);
+  }
+  .when {
+    font-size: var(--ag-fs-small);
+    color: var(--ag-muted);
+    padding-top: 2px;
+  }
+  .what {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+  .t {
+    color: var(--ag-text-bright);
+    font-weight: var(--ag-fw-semi);
+  }
+  .c {
+    color: #9fc0ff;
+    font-size: var(--ag-fs-base);
+  }
+  .loc {
+    color: var(--ag-muted);
+  }
+  .d {
+    color: var(--ag-muted);
+    font-size: var(--ag-fs-base);
+    white-space: pre-line;
+    margin-top: 4px;
+  }
+  .li-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    flex-wrap: wrap;
+    padding: 20px;
+    border: 1px solid var(--ag-border);
+    border-radius: var(--ag-radius-lg);
+    background: var(--ag-panel);
+  }
+  .li-copy {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    align-items: flex-start;
+  }
+  .li-text {
+    color: var(--ag-text-2);
+  }
+  .badge-wrap {
+    max-width: 100%;
+    overflow: hidden;
+  }
+  @media (max-width: 600px) {
+    .timeline li {
+      grid-template-columns: 1fr;
+      gap: 4px;
+    }
+  }
+</style>
