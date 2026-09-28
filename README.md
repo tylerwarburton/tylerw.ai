@@ -8,6 +8,10 @@ Personal site — the **Signal** look: dark operator-console aesthetic, one blue
   Token Maxers, calendar link, socials. `// TODO` marks values to confirm.
 - **`src/data/projects.ts`**: every project. Each entry becomes a card on
   `/projects` and its own page at `/projects/<slug>`.
+- **`src/data/linkedin/Positions.csv`**: your LinkedIn data export (LinkedIn →
+  Settings → Data privacy → Get a copy of your data → Positions). When present,
+  the Experience section is built from it, LinkedIn-style (roles grouped by
+  company, durations, see more). Without it, `companies` in `site.ts` is used.
 - **`src/data/github-snapshot.json`**: monthly commit counts. Set a
   `GITHUB_TOKEN` env var in Cloudflare Pages (fine-grained, read access to the
   orgs) and the build refreshes these live, private repos included; without it

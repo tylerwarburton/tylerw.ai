@@ -29,40 +29,54 @@ export const site = {
     ],
   },
 
-  // — Companies —————————————————————————————————————————————
+  // — Experience fallback ——————————————————————————————————
+  //   Used until a LinkedIn Positions.csv is dropped in src/data/linkedin/.
+  //   `href` and `note` also enrich matching LinkedIn rows by company name.
   companies: [
     {
-      name: 'CipherPlay',
-      role: 'Founder',
-      years: '2024 to now',
-      href: 'https://cipherplay.net',
-      note: 'Cybersecurity, blockchain, and AI studio. Home of HeyHauler, BreederOps, Paralith, and Opportunity.',
+      name: 'American Technical Consultants',
+      role: 'Fractional CTO',
+      start: 'Aug 2026',
+      end: '',
+      note: 'Leading technology strategy, engineering, and AI adoption.',
     },
     {
       name: 'AutoGrow',
       role: 'Founder',
-      years: '2026 to now',
+      start: 'Mar 2026',
+      end: '',
       href: 'https://github.com/CipherPlayLabs/Auto-Grow-releases',
       note: 'LinkedIn growth automation with an AI research marketplace.',
     },
     {
+      name: 'CipherPlay',
+      role: 'Founder',
+      start: '2024',
+      end: '',
+      href: 'https://cipherplay.net',
+      note: 'Cybersecurity, blockchain, and AI studio. Home of HeyHauler, BreederOps, Paralith, and Opportunity.',
+    },
+    {
       name: 'RandAO',
       role: 'Co-founder & CTO',
-      years: '2024 to now',
+      start: '2024',
+      end: '',
       href: 'https://randao.net',
       note: 'Decentralized verifiable randomness for AO.',
     },
     {
-      name: 'American Technical Consultants',
-      role: 'Fractional CTO',
-      years: 'Aug 2026 to now',
-      note: 'Leading technology strategy, engineering, and AI adoption.',
+      name: 'Lockheed Martin',
+      role: 'Senior Software Engineer',
+      start: '',
+      end: '',
+      note: 'Led cybersecurity work on critical programs.',
     },
     {
       name: 'Lockheed Martin',
-      role: 'Senior Software Engineer · Program Management',
-      years: 'Prior',
-      note: 'Led cybersecurity work on critical programs and ran complex technical programs end to end.',
+      role: 'Program Management',
+      start: '',
+      end: '',
+      note: 'Ran complex technical programs end to end.',
     },
   ],
 
@@ -124,6 +138,7 @@ export type Site = typeof site;
 /** 1_234_000_000 -> "1.2B" */
 export function compact(n: number): string {
   if (n >= 1e12) return `${+(n / 1e12).toFixed(1)}T`;
+  if (n >= 1e11) return `${Math.floor(n / 1e9)}B`;
   if (n >= 1e9) return `${+(n / 1e9).toFixed(1)}B`;
   if (n >= 1e6) return `${+(n / 1e6).toFixed(0)}M`;
   if (n >= 1e3) return `${+(n / 1e3).toFixed(1)}K`;
