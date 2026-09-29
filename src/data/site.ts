@@ -31,13 +31,14 @@ export const site = {
 
   // — Experience fallback ——————————————————————————————————
   //   Used until a LinkedIn Positions.csv is dropped in src/data/linkedin/.
-  //   `href` and `note` also enrich matching LinkedIn rows by company name.
+  //   `href`, `linkedin`, and `note` also enrich matching rows by company name.
   companies: [
     {
       name: 'American Technical Consultants',
       role: 'CTO (Fractional)',
       start: 'Aug 2026',
       end: '',
+      linkedin: 'https://www.linkedin.com/company/108616645/',
       note: 'Leading technology strategy, engineering, and secure AI adoption.',
     },
     {
@@ -45,8 +46,9 @@ export const site = {
       role: 'CTO',
       start: 'Mar 2026',
       end: '',
-      href: 'https://github.com/CipherPlayLabs/Auto-Grow-releases',
-      note: 'LinkedIn growth automation with an AI research marketplace.',
+      href: 'https://useautogrow.com',
+      linkedin: 'https://www.linkedin.com/company/144697947/',
+      note: 'Research agents and hyper-personalized outreach: find the right people, then reach them.',
     },
     {
       name: 'CipherPlay',
@@ -54,6 +56,7 @@ export const site = {
       start: '2024',
       end: '',
       href: 'https://cipherplay.net',
+      linkedin: 'https://www.linkedin.com/company/105990131/',
       note: 'Building secure, fair systems for the modern web. Home of HeyHauler, BreederOps, Paralith, and Opportunity.',
     },
     {

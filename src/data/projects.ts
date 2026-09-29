@@ -66,17 +66,21 @@ export const projects: Project[] = [
     slug: 'autogrow',
     name: 'AutoGrow',
     category: 'ai',
-    tagline: 'LinkedIn growth on autopilot, with a paid research marketplace.',
+    tagline: 'Find the right people, then reach them.',
     summary:
-      'A desktop app that automates LinkedIn outreach and growth for founders and sales teams. It includes a marketplace where customers buy AI research briefs on leads, markets, and companies.',
+      'AutoGrow combines multiple research agents, intent signals, and private databases to find the people most likely to care. Then it turns what it learned into hyper-personalized outreach built around each person.',
     role: 'CTO & lead engineer',
     involvement:
-      'Built the product from the first commit: the desktop app, the server, billing, and the research worker fleet that fulfils briefs.',
+      'Built the product from the first commit: the app, the server, billing, and the research worker fleet that powers every campaign.',
     stack: ['TypeScript', 'Electron', 'Node', 'Postgres', 'Docker'],
     years: '2026 to now',
     status: 'Live',
     company: 'AutoGrow',
-    links: [{ label: 'Releases', href: 'https://github.com/CipherPlayLabs/Auto-Grow-releases' }],
+    links: [
+      { label: 'useautogrow.com', href: 'https://useautogrow.com' },
+      { label: 'LinkedIn', href: 'https://www.linkedin.com/company/144697947/' },
+    ],
+    brand: { color: '#5B8DEF', logo: '/brands/autogrow.svg', shot: '/shots/autogrow.webp' },
     featured: true,
   },
   {

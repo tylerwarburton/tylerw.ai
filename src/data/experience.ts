@@ -14,6 +14,7 @@ export interface Role {
 export interface CompanyGroup {
   company: string;
   href?: string;
+  linkedin?: string;
   roles: Role[];
 }
 
@@ -72,7 +73,12 @@ for (const r of rows) {
   let g = groups.find((x) => x.company.toLowerCase() === r.company.toLowerCase());
   if (!g) {
     const extra = extras.get(r.company.toLowerCase());
-    g = { company: r.company, href: extra && 'href' in extra ? extra.href : undefined, roles: [] };
+    g = {
+      company: r.company,
+      href: extra && 'href' in extra ? extra.href : undefined,
+      linkedin: extra && 'linkedin' in extra ? extra.linkedin : undefined,
+      roles: [],
+    };
     groups.push(g);
   }
   const { company: _c, ...role } = r;
