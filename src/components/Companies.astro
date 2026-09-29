@@ -15,6 +15,7 @@ const monogram = (name: string) =>
 const logos: Record<string, string> = {
   cipherplay: '/brands/cipherplay.svg',
   randao: '/brands/randao.webp',
+  autogrow: '/brands/autogrow.svg',
 };
 ---
 
@@ -36,6 +37,18 @@ const logos: Record<string, string> = {
           const total = tenure(g);
           return (
             <li class="co">
+              {g.linkedin && (
+                <a
+                  class="co-li"
+                  href={g.linkedin}
+                  target="_blank"
+                  rel="noopener"
+                  aria-label={`${g.company} on LinkedIn`}
+                  title={`${g.company} on LinkedIn`}
+                >
+                  <Icon name="linkedin" size={16} />
+                </a>
+              )}
               <span class:list={['logo', { img: logos[g.company.toLowerCase()] }]} aria-hidden="true">
                 {logos[g.company.toLowerCase()] ? (
                   <img src={logos[g.company.toLowerCase()]} alt="" width="48" height="48" loading="lazy" />
@@ -170,6 +183,28 @@ const logos: Record<string, string> = {
     flex-direction: column;
     gap: 2px;
     margin-bottom: 12px;
+  }
+  .co {
+    position: relative;
+  }
+  .co-li {
+    position: absolute;
+    top: 20px;
+    right: 0;
+    display: inline-grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    border-radius: var(--ag-radius-sm);
+    color: var(--ag-muted);
+    transition: color var(--ag-dur-base) var(--ag-ease), background var(--ag-dur-base) var(--ag-ease);
+  }
+  .co-li:hover {
+    color: #0a66c2;
+    background: rgba(255, 255, 255, 0.92);
+  }
+  .co-body {
+    padding-right: 36px;
   }
   .co-name {
     display: inline-flex;
