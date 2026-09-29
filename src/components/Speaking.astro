@@ -29,19 +29,23 @@ const { speaking, group } = site;
 
       <ul class="items">
         {
-          speaking.items.map((it) => (
-            <li class="reveal">
-              <a
-                class="item spot"
-                href={it.href}
-                {...(it.href.startsWith('http') ? { target: '_blank', rel: 'noopener' } : {})}
-              >
-                <span class="kind mono">{it.kind}</span>
-                <span class="title">{it.title}</span>
-                <span class="where">{it.where}</span>
-              </a>
-            </li>
-          ))
+          speaking.items.map((it) => {
+            const href = 'href' in it ? it.href : undefined;
+            const Tag = href ? 'a' : 'div';
+            return (
+              <li class="reveal">
+                <Tag
+                  class:list={['item spot', { static: !href }]}
+                  {...(href ? { href } : {})}
+                  {...(href?.startsWith('http') ? { target: '_blank', rel: 'noopener' } : {})}
+                >
+                  <span class="kind mono">{it.kind}</span>
+                  <span class="title">{it.title}</span>
+                  <span class="where">{it.where}</span>
+                </Tag>
+              </li>
+            );
+          })
         }
       </ul>
     </div>

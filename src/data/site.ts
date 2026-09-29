@@ -10,9 +10,9 @@ export const site = {
   eyebrow: 'Fractional CTO · AI & Security',
   headline: 'I build companies with AI.',
   tagline:
-    'I help companies adopt AI securely. CTO at ATC, AutoGrow, CipherPlay, and RandAO, ex-Lockheed Martin. I ship SaaS, crypto protocols, and hardware.',
+    'I help companies adopt AI securely. Founder of CipherPlay, fractional CTO at ATC, AutoGrow, and RandAO, ex-Lockheed Martin. I ship SaaS, crypto protocols, and hardware.',
   description:
-    'Tyler Warburton: fractional CTO helping companies adopt AI securely. CTO at ATC, AutoGrow, CipherPlay, and RandAO. Ex-Lockheed Martin.',
+    'Tyler Warburton: fractional CTO helping companies adopt AI securely. Founder of CipherPlay; fractional CTO at ATC, AutoGrow, and RandAO. Two-time ISACA CommunITy Day keynote speaker. Ex-Lockheed Martin.',
 
   // — Primary call to action —————————————————————————————————
   cta: { label: 'Book a call', href: '#book' },
@@ -43,7 +43,7 @@ export const site = {
     },
     {
       name: 'AutoGrow',
-      role: 'CTO',
+      role: 'CTO (Fractional)',
       start: 'Mar 2026',
       end: '',
       href: 'https://useautogrow.com',
@@ -52,7 +52,7 @@ export const site = {
     },
     {
       name: 'CipherPlay',
-      role: 'CTO & Co-Founder',
+      role: 'Founder',
       start: '2024',
       end: '',
       href: 'https://cipherplay.net',
@@ -61,7 +61,7 @@ export const site = {
     },
     {
       name: 'RandAO',
-      role: 'CTO',
+      role: 'CTO (Fractional)',
       start: '2024',
       end: '',
       href: 'https://randao.net',
@@ -86,19 +86,18 @@ export const site = {
   // — Public work: talks, education, community ——————————————
   speaking: {
     intro:
-      'I speak about AI around Richmond and teach people to use it well: what is real, what is hype, and where the security risks are. For business leaders, builders, and teams.',
+      'Two-time keynote speaker at ISACA CommunITy Day. I speak about AI around Richmond and teach people to use it well: what is real, what is hype, and where the security risks are. For business leaders, builders, and teams.',
     items: [
+      {
+        kind: 'Keynote · 2×',
+        title: 'Keynote speaker, ISACA CommunITy Day',
+        where: 'Two-time keynote on AI and security',
+      },
       {
         kind: 'Talk',
         title: 'Smoke and Mirrors: AI for business leaders',
         where: 'Live event',
         href: 'https://www.linkedin.com/posts/tyler-warburton_smoke-and-mirrors-ai-for-business-leaders-activity-7444375795164307457-7LBo',
-      },
-      {
-        kind: 'Article',
-        title: "You wouldn't download a waterfall. So I coded one with Claude.",
-        where: 'Medium · dev.to',
-        href: 'https://medium.com/@tylerw9954/claude-cad-design-a18a928a21f6',
       },
       {
         kind: 'Workshops',
