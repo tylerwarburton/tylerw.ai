@@ -69,7 +69,7 @@ export const projects: Project[] = [
     tagline: 'Find the right people, then reach them.',
     summary:
       'AutoGrow combines multiple research agents, intent signals, and private databases to find the people most likely to care. Then it turns what it learned into hyper-personalized outreach built around each person.',
-    role: 'CTO & lead engineer',
+    role: 'CTO (Fractional) & lead engineer',
     involvement:
       'Built the product from the first commit: the app, the server, billing, and the research worker fleet that powers every campaign.',
     stack: ['TypeScript', 'Electron', 'Node', 'Postgres', 'Docker'],
@@ -106,7 +106,7 @@ export const projects: Project[] = [
     category: 'ai',
     tagline: 'Roll-off dispatch, billing, and fleet control.',
     summary: 'Software for companies that haul things, like roll-off dumpsters: orders, drivers, yards, disposal, invoicing, and payments. Clients request and track their jobs in the same system the crew runs on.',
-    role: 'CTO & lead engineer',
+    role: 'Founder & lead engineer',
     involvement:
       'Built the platform, the design system, the multi-org model, and an AI simulation that drives a live business day against the real app.',
     stack: ['Next.js', 'TypeScript', 'Postgres', 'Drizzle', 'Docker'],
@@ -123,7 +123,7 @@ export const projects: Project[] = [
     category: 'ai',
     tagline: 'Run the breeding business. All in one place.',
     summary: 'Management software for agricultural animal raising, starting with rodents bred for pets and reptile food: racks, breeders, litters, health, and output. Incubator tracking for reptiles and support for dog breeders are next, so it becomes the one place to run any breeding operation.',
-    role: 'CTO & lead engineer',
+    role: 'Founder & lead engineer',
     involvement:
       'Built the colony model, the voice console, and the guided check-in walk where the AI only asks about what you have not already said.',
     stack: ['Next.js', 'TypeScript', 'Postgres', 'Claude'],
@@ -140,7 +140,7 @@ export const projects: Project[] = [
     tagline: 'Interactive presentations for company leadership and education.',
     summary:
       'Presenters click through a deck on the projector while everyone in the room follows on their phone, answers when a slide is a question, and is scored on speed and accuracy. Individual and team leaderboards roll up live; attendees join with a short code, no accounts.',
-    role: 'CTO & lead engineer',
+    role: 'Founder & lead engineer',
     involvement:
       'Built it from the initial scaffold: the real-time engine, the authoring studio, question types, scoring, and deployment. A product for The Cyber Space.',
     stack: ['Next.js', 'Socket.IO', 'Redis', 'Prisma', 'Postgres'],
@@ -177,7 +177,7 @@ export const projects: Project[] = [
     tagline: 'Decentralized, verifiable randomness for AO.',
     summary:
       'A randomness protocol where a network of providers commits and reveals entropy, backed by a verifiable delay function, so apps on AO get random numbers nobody can rig. It includes the RAND token, a provider network, a JavaScript SDK, and dashboards.',
-    role: 'CTO',
+    role: 'CTO (Fractional)',
     involvement:
       'Led the technology: the provider node, the SDK, the dashboards, the docs, and the hardware miner program.',
     stack: ['Lua', 'TypeScript', 'Go', 'Docker', 'AO'],
