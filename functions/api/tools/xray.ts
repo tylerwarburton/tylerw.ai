@@ -20,6 +20,7 @@ import {
   store,
   type Question,
 } from '../_lib';
+import { fetchPolicy, policyUrlFor } from '../_policy';
 
 export const XRAY_QUESTIONS: Record<string, Question> = {
   sells: {
@@ -82,7 +83,8 @@ export interface Scorecard {
 export const onRequestPost = handler(async (ctx) => {
   const { env, request } = ctx;
   const device = deviceId(request);
-  const { app } = await body<{ app?: string }>(request);
+  const { app, store: storeId } = await body<{ app?: string; store?: string }>(request);
+  if (storeId !== undefined) return anyApp(ctx, device, String(storeId));
   if (!app || !/^[a-z0-9-]{1,40}$/.test(app)) throw new HttpError(400, 'Pick an app.');
 
   const policy = await asset<Policy>(ctx, `/demo-data/xray/${app}.json`);
@@ -112,6 +114,33 @@ export const onRequestPost = handler(async (ctx) => {
   );
   return json({ ...card, cached });
 });
+
+/** Any App Store app: find its policy link, read the policy, score it live. */
+async function anyApp(ctx: Parameters<Parameters<typeof handler>[0]>[0], device: string, id: string) {
+  const { env } = ctx;
+  if (!/^\d{5,12}$/.test(id)) throw new HttpError(400, 'Pick an app from the search results.');
+  await rateLimit(env, device);
+  const s = await store(env);
+  const cacheKey = `xray:as:${id}`;
+  let card = JSON.parse((await s.get(cacheKey)) ?? 'null') as Scorecard | null;
+  const cached = !!card;
+  if (!card) {
+    await rateLimit(env, `${device}:live-xray`, 6);
+    await assertBudget(env);
+    const { url, name } = await policyUrlFor(id);
+    const { clauses, updated } = await fetchPolicy(url, env.JINA_API_KEY);
+    card = await score(env, { id: `as-${id}`, name: name || 'This app', category: 'App Store', url, updated, clauses });
+    await s.set(cacheKey, JSON.stringify(card));
+  }
+  const done = card;
+  ctx.waitUntil(
+    Promise.all([
+      s.addEvent('xray', device, { app: `as-${id}`, name: done.name, risks: done.risks, riskTotal: done.riskTotal }, done.checks),
+      s.incr('decisions', done.checks),
+    ]),
+  );
+  return json({ ...done, cached });
+}
 
 export async function score(env: Parameters<typeof judgeMany>[0], policy: Policy): Promise<Scorecard> {
   const started = Date.now();
