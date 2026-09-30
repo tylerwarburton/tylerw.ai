@@ -390,7 +390,7 @@ async function runXray(id: string) {
     const r = await api<Card>('/api/tools/xray', { app: id }, t.retry);
     t.stop();
     if (r.cached) await countUp(out, r.checks, 1400);
-    renderXray(out, r, r.cached ? r.ms : performance.now() - started);
+    renderXray(out, r, r.cached ? null : performance.now() - started);
   } catch (e) {
     t.stop();
     showError(out, e);
@@ -398,7 +398,7 @@ async function runXray(id: string) {
   reveal(out);
 }
 
-function renderXray(out: HTMLElement, r: Card, ms: number) {
+function renderXray(out: HTMLElement, r: Card, ms: number | null) {
   const risky = r.rows.filter((x) => !x.good && x.p >= 0.6).sort((a, b) => b.p - a.p);
   const light = (x: Card['rows'][number]) =>
     x.good
@@ -416,7 +416,7 @@ function renderXray(out: HTMLElement, r: Card, ms: number) {
     <div class="panel-d">
       <div class="x-head"><span class="mono-g" style="--h:${hue(r.name)}">${esc(initials(r.name))}</span>
         <div><h3>${esc(r.name)}</h3><p>Policy ${esc(r.updated || 'date not stated')} · <a href="${esc(r.url)}" target="_blank" rel="noopener">source</a></p></div></div>
-      <p class="speed" style="margin:12px 0 0"><b>${fmt(r.clauses)} clauses × 12 questions = ${fmt(r.checks)} checks</b> in ${secs(ms)}</p>
+      <p class="speed" style="margin:12px 0 0"><b>${fmt(r.clauses)} clauses × 12 questions = ${fmt(r.checks)} checks</b> ${ms == null ? '· scored ahead of time, each flag double-checked' : `in ${secs(ms)}`}</p>
     </div>
     <div class="verdict" style="--c:${r.risks >= 7 ? 'var(--d-bad)' : r.risks >= 4 ? 'var(--d-unsure)' : 'var(--d-good)'}">
       <div class="word">${r.risks} of ${r.riskTotal} risk signals found</div>
@@ -550,7 +550,7 @@ async function pickJob(code: string, label: string) {
     const r = await api<JobRes>('/api/tools/jobs', { code }, t.retry);
     t.stop();
     if (r.cached) await countUp(out, r.checks, 900);
-    renderJobs(out, r, r.cached ? r.ms : performance.now() - started);
+    renderJobs(out, r, r.cached ? null : performance.now() - started);
     reveal(out);
   } catch (e) {
     t.stop();
@@ -558,7 +558,7 @@ async function pickJob(code: string, label: string) {
   }
 }
 
-function renderJobs(out: HTMLElement, r: JobRes, ms: number) {
+function renderJobs(out: HTMLElement, r: JobRes, ms: number | null) {
   const B = ['Automate', 'Augment', 'Own'];
   const split = B.map(
     (b) =>
@@ -581,7 +581,7 @@ function renderJobs(out: HTMLElement, r: JobRes, ms: number) {
   out.innerHTML = `
     <div class="panel-d">
       <h3 style="margin:0;font-size:22px">${esc(r.title)}</h3>
-      <p class="speed" style="margin:6px 0 12px"><b>${r.tasks.length} tasks sorted</b> in ${secs(ms)}</p>
+      <p class="speed" style="margin:6px 0 12px"><b>${r.tasks.length} tasks sorted</b> ${ms == null ? '· part of a run over all 923 jobs' : `in ${secs(ms)}`}</p>
       <div class="split">${split}</div>
       <p style="margin:12px 0 0;font-size:15px">${
         r.percentile != null ? `More exposed to AI than <b>${pct(r.percentile)}</b> of jobs.` : `Average exposure ${r.exposure.toFixed(1)} of 5.`
