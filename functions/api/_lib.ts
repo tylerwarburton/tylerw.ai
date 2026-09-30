@@ -19,7 +19,9 @@ export interface Env {
   DEMO_SPEND_CAP?: string;
   /** Secret for presenter actions on the wall (freeze/reset). */
   DEMO_ADMIN_KEY?: string;
-  /** D1 database for tokens, spend and the room wall. */
+  /** Durable Object holding tokens, spend and the room wall (Worker deploys). */
+  ROOM?: DurableObjectNamespace;
+  /** D1 alternative for Pages deploys. */
   DEMO_DB?: D1Database;
   ASSETS: { fetch: typeof fetch };
 }
@@ -164,7 +166,29 @@ async function d1Store(db: D1Database): Promise<Store> {
   };
 }
 
+interface RoomRpc {
+  get(k: string): Promise<string | null>;
+  set(k: string, v: string): Promise<void>;
+  incr(k: string, by: number): Promise<number>;
+  addEvent(tool: string, device: string, data: string, decisions: number): Promise<void>;
+  events(): Promise<{ tool: string; device: string; data: string; decisions: number; ts: number }[]>;
+  clearEvents(): Promise<void>;
+}
+
+function roomStore(ns: DurableObjectNamespace): Store {
+  const room = ns.get(ns.idFromName('room')) as unknown as RoomRpc;
+  return {
+    get: (k) => room.get(k),
+    set: (k, v) => room.set(k, v),
+    incr: (k, by) => room.incr(k, by),
+    addEvent: (tool, device, data, decisions) => room.addEvent(tool, device, JSON.stringify(data), decisions),
+    events: () => room.events(),
+    clearEvents: () => room.clearEvents(),
+  };
+}
+
 export async function store(env: Env): Promise<Store> {
+  if (env.ROOM) return roomStore(env.ROOM);
   return env.DEMO_DB ? d1Store(env.DEMO_DB) : memoryStore;
 }
 
