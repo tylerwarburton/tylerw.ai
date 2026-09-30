@@ -133,18 +133,38 @@ export async function score(env: Parameters<typeof judgeMany>[0], policy: Policy
     ).then((r) => r.answers),
   );
   const perClause = results.flat();
+  const model = env.DEMO_XRAY_MODEL || XRAY_MODEL;
 
-  const rows = Object.keys(XRAY_QUESTIONS).map((key) => {
-    let best = 0;
-    let bestP = -1;
-    perClause.forEach((a, i) => {
-      const p = a[key] as number;
-      if (p > bestP) {
-        bestP = p;
-        best = i;
-      }
-    });
-    return { key, good: GOOD.has(key), p: Math.max(0, bestP), clause: best, evidence: policy.clauses[best] };
+  // Verify pass: a batch read can over-flag a clause, so each question's top
+  // candidates are re-asked alone, one focused question at a time. A flag
+  // stands only if a candidate is confirmed; the confirmed clause is the evidence.
+  const rows = await pool(Object.keys(XRAY_QUESTIONS), 12, async (key) => {
+    const ranked = perClause
+      .map((a, i) => ({ i, p: a[key] as number }))
+      .sort((x, y) => y.p - x.p);
+    const candidates = ranked.filter((c) => c.p >= 0.5).slice(0, 3);
+    let best = ranked[0] ?? { i: 0, p: 0 };
+    if (candidates.length) {
+      const verified = await judgeMany(
+        env,
+        candidates.map((c) => policy.clauses[c.i]),
+        { [key]: XRAY_QUESTIONS[key] },
+        [
+          `Each item is one clause from the ${policy.name} privacy policy.`,
+          'Be strict: answer high only if the clause itself clearly states this. Do not infer from related topics.',
+          'A clause that says the company does NOT do it is a no.',
+        ].join(' '),
+        model,
+      ).then((r) => r.answers.map((a, j) => ({ i: candidates[j].i, p: a[key] as number })));
+      best = verified.sort((x, y) => y.p - x.p)[0];
+    }
+    return {
+      key,
+      good: GOOD.has(key),
+      p: Math.max(0, best.p),
+      clause: best.i,
+      evidence: policy.clauses[best.i],
+    };
   });
   const riskRows = rows.filter((r) => !r.good);
   return {
