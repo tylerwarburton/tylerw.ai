@@ -1,0 +1,294 @@
+---
+// Projector view for the room. Unlisted, noindex.
+// Presenter keys: F freeze/unfreeze, R reset. Open as /demo/wall?key=<DEMO_ADMIN_KEY>
+// to enable them (the key stays in this tab's sessionStorage).
+import QRCode from 'qrcode';
+import Base from '../../layouts/Base.astro';
+
+const qr = await QRCode.toString('https://tylerw.ai/demo', {
+  type: 'svg',
+  margin: 1,
+  color: { dark: '#0f1115', light: '#ffffff' },
+  errorCorrectionLevel: 'M',
+});
+---
+
+<Base title="Room wall · System 1, live" noindex>
+  <Fragment slot="head">
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap"
+      rel="stylesheet"
+    />
+  </Fragment>
+
+  <main class="wall" id="wall">
+    <header class="w-head">
+      <div class="w-title">
+        <div class="w-brand">
+          <img src="/demo-data/brand/isaca-va-rev.png" alt="ISACA Virginia Chapter" />
+          <p class="w-eyebrow">System 1, live · CommunITy Day</p>
+        </div>
+        <div class="w-totals">
+          <span><b class="mono" id="tDecisions">0</b> decisions</span>
+          <span><b class="mono" id="tPeople">0</b> people</span>
+          <span><b class="mono" id="tSpent">$0.00</b> spent</span>
+        </div>
+      </div>
+      <div class="w-qr">
+        <div class="qr" set:html={qr} />
+        <span class="mono">tylerw.ai/demo</span>
+      </div>
+    </header>
+
+    <section class="w-panels">
+      <div class="w-panel">
+        <h2>Scam Check <span class="count mono" id="scamCount"></span></h2>
+        <div id="scamBars" class="bars"></div>
+        <p class="w-note" id="scamUnsure"></p>
+      </div>
+      <div class="w-panel">
+        <h2>Privacy X-ray <span class="count mono" id="xrayCount"></span></h2>
+        <div id="xrayWorst" class="worst"></div>
+        <div id="xrayApps" class="bars"></div>
+      </div>
+      <div class="w-panel">
+        <h2>Job Radar <span class="count mono" id="jobsCount"></span></h2>
+        <div id="jobsSplit" class="w-split"></div>
+        <div id="jobsExposed" class="worst"></div>
+        <h3>Most borderline tasks</h3>
+        <ol id="jobsBorder" class="border"></ol>
+      </div>
+    </section>
+
+    <div class="w-status mono" id="wStatus" aria-live="polite"></div>
+  </main>
+</Base>
+
+<script>
+  import '../../scripts/demo/wall';
+</script>
+
+<style is:global>
+  html:has(.wall),
+  html:has(.wall) body {
+    height: 100%;
+    overflow: hidden;
+  }
+  .wall {
+    --bg: #0f1115;
+    --panel: #161a22;
+    --border: #2a303c;
+    --text: #e6e8ee;
+    --muted: #8b93a7;
+    --accent: #5b8def;
+    --bad: #f87171;
+    --unsure: #fbbf24;
+    --good: #4ade80;
+    font-family: 'IBM Plex Sans', -apple-system, sans-serif;
+    color: var(--text);
+    height: 100vh;
+    display: grid;
+    grid-template-rows: auto 1fr;
+    gap: 1.4vw;
+    padding: 2vw 2.4vw;
+    font-size: clamp(14px, 1.15vw, 26px);
+  }
+  .wall .mono {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+  }
+  .w-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 2vw;
+  }
+  .w-brand {
+    display: flex;
+    align-items: center;
+    gap: 1.4vw;
+  }
+  .w-brand img {
+    height: 3.2vw;
+    min-height: 36px;
+    width: auto;
+  }
+  .w-eyebrow {
+    margin: 0;
+    font-size: 1em;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--accent);
+    font-weight: 600;
+  }
+  .w-totals {
+    display: flex;
+    gap: 3vw;
+    margin-top: 0.6vw;
+    font-size: 1.6em;
+    color: var(--muted);
+  }
+  .w-totals b {
+    display: block;
+    font-size: 2.4em;
+    line-height: 1;
+    color: var(--text);
+    font-weight: 600;
+  }
+  .w-qr {
+    display: grid;
+    justify-items: center;
+    gap: 0.4vw;
+    color: var(--muted);
+  }
+  .w-qr .qr {
+    width: 9vw;
+    min-width: 110px;
+    background: #fff;
+    border-radius: 10px;
+    padding: 6px;
+  }
+  .w-qr svg {
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+  .w-panels {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.4vw;
+    min-height: 0;
+  }
+  .w-panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 1.4vw;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    gap: 1vw;
+  }
+  .w-panel h2 {
+    margin: 0;
+    font-size: 1.5em;
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+  }
+  .w-panel h3 {
+    margin: 0.4vw 0 0;
+    font-size: 0.9em;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+  }
+  .count {
+    color: var(--muted);
+    font-size: 0.8em;
+    font-weight: 400;
+  }
+  .bars {
+    display: grid;
+    gap: 0.7vw;
+  }
+  .bar {
+    display: grid;
+    grid-template-columns: 38% 1fr 3ch;
+    gap: 0.8vw;
+    align-items: center;
+    border-radius: 8px;
+    transition: background 0.6s ease;
+  }
+  .bar .l {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .bar .t {
+    height: 1.1em;
+    border-radius: 999px;
+    background: #1d222c;
+    overflow: hidden;
+  }
+  .bar .t i {
+    display: block;
+    height: 100%;
+    background: var(--c, var(--accent));
+    border-radius: inherit;
+    transition: width 0.6s cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  .bar .n {
+    text-align: right;
+  }
+  .pulse {
+    animation: pulse 0.6s ease;
+  }
+  @keyframes pulse {
+    0% {
+      background: rgba(91, 141, 239, 0.35);
+    }
+    100% {
+      background: transparent;
+    }
+  }
+  .w-note {
+    margin: auto 0 0;
+    color: var(--muted);
+  }
+  .worst {
+    background: #0a0c10;
+    border-left: 5px solid var(--bad);
+    border-radius: 0 10px 10px 0;
+    padding: 0.8vw 1vw;
+    font-size: 1.15em;
+  }
+  .worst:empty {
+    display: none;
+  }
+  .worst small {
+    display: block;
+    color: var(--muted);
+    font-size: 0.75em;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+  }
+  .w-split {
+    display: flex;
+    height: 2.4em;
+    border-radius: 10px;
+    overflow: hidden;
+    font-weight: 600;
+    color: #0a0d13;
+  }
+  .w-split span {
+    display: grid;
+    place-items: center;
+    white-space: nowrap;
+    overflow: hidden;
+    transition: width 0.6s ease;
+  }
+  .border {
+    margin: 0;
+    padding-left: 1.2em;
+    display: grid;
+    gap: 0.5vw;
+    color: #cbd3e0;
+    font-size: 0.95em;
+  }
+  .w-empty {
+    color: var(--muted);
+    font-size: 1.1em;
+  }
+  .w-status {
+    position: fixed;
+    right: 1.4vw;
+    bottom: 1vw;
+    color: var(--muted);
+    font-size: 0.8em;
+  }
+  .w-status.frozen {
+    color: var(--unsure);
+  }
+</style>

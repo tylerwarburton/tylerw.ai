@@ -13,5 +13,10 @@
   "dependencies": {
     "astro": "^5.1.1",
     "three": "^0.186.1"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20260930.2",
+    "qrcode": "^1.5.4",
+    "wrangler": "^4.144.0"
   }
 }
