@@ -22,12 +22,28 @@ import {
 } from '../_lib';
 
 export const XRAY_QUESTIONS: Record<string, Question> = {
-  sells: { type: 'noul', q: 'Does this clause allow selling or "sharing" personal data for advertising?' },
+  sells: {
+    type: 'noul',
+    q: 'Does this clause say the company sells personal data, or "shares" it for targeted advertising?',
+    hint: 'giving data to vendors or service providers who work for the company does not count',
+  },
   third_party: { type: 'noul', q: 'Does it allow sharing personal data with third parties or partners?' },
-  location: { type: 'noul', q: 'Does it collect precise location?' },
+  location: {
+    type: 'noul',
+    q: 'Does it collect precise location?',
+    hint: 'GPS or precise device location; approximate location from an IP address does not count',
+  },
   contacts: { type: 'noul', q: 'Does it collect your contacts or address book?' },
-  biometrics: { type: 'noul', q: 'Does it collect face, voice or other biometric data?' },
-  health: { type: 'noul', q: 'Does it collect health or fitness data?' },
+  biometrics: {
+    type: 'noul',
+    q: 'Does it collect face, voice or other biometric data?',
+    hint: 'e.g. face scans, faceprints, voiceprints, fingerprints, voice recordings',
+  },
+  health: {
+    type: 'noul',
+    q: 'Does it collect health or fitness data?',
+    hint: 'e.g. heart rate, steps, workouts, sleep, medical or menstrual data; safety or emergency disclosures do not count',
+  },
   ai_training: { type: 'noul', q: 'Does it allow using your content to train AI models?' },
   retention: { type: 'noul', q: 'Does it keep data after you delete your account?' },
   tracking: { type: 'noul', q: 'Does it track you across other apps or websites?' },
@@ -37,7 +53,8 @@ export const XRAY_QUESTIONS: Record<string, Question> = {
 };
 
 const GOOD = new Set(['delete', 'opt_out']);
-const BATCH = 12;
+const BATCH = 8;
+export const XRAY_MODEL = 'openai/gpt-oss-120b';
 const CONCURRENCY = 20;
 
 interface Policy {
@@ -106,7 +123,13 @@ export async function score(env: Parameters<typeof judgeMany>[0], policy: Policy
       env,
       clauses,
       XRAY_QUESTIONS,
-      `These are consecutive clauses from the ${policy.name} privacy policy. Judge each clause on its own words: answer yes only if that clause itself says it.`,
+      [
+        `These are consecutive clauses from the ${policy.name} privacy policy.`,
+        'Judge each clause only on its own words: answer high only if that clause itself says the company does it (or lets you do it, for the delete and opt-out questions).',
+        'A clause that says the company does NOT do something ("we do not sell your data") is a no for that question.',
+        'Generic intros, headings and clauses on other topics are a no for every question.',
+      ].join(' '),
+      env.DEMO_XRAY_MODEL || XRAY_MODEL,
     ).then((r) => r.answers),
   );
   const perClause = results.flat();

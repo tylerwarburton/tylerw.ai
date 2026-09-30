@@ -12,7 +12,7 @@ Cloudflare Pages Functions in `functions/api/`, deployed with the site.
      event key. The demo shows "budget reached" at this number.
    - `DEMO_ADMIN_KEY`: any long random string. Open the wall as
      `/demo/wall?key=<this>` to enable F (freeze) and R (reset).
-   - `DEMO_MODEL` (optional): the fast model; defaults to `openai/gpt-oss-120b`.
+   - `DEMO_MODEL` (optional): the fast model; defaults to `inception/mercury-2.5`.
    - `DEMO_FALLBACK_MODELS` (optional): comma-separated backups.
 2. **Bindings → D1 database**: create a D1 database (e.g. `tylerw-demo`) and
    bind it as `DEMO_DB`. Tables are created automatically on first request.

@@ -184,6 +184,12 @@ document.addEventListener('click', (e) => {
   void copy(el.dataset.copyText!, el.tagName === 'A' ? 'Prompt copied too, in case it does not pre-fill' : 'Prompt copied');
 });
 
+/** Bring a fresh result into view inside the sheet (results land below the fold on phones). */
+function reveal(el: HTMLElement) {
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  requestAnimationFrame(() => el.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' }));
+}
+
 function showError(el: HTMLElement, err: unknown) {
   el.innerHTML = `<div class="err">${esc(err instanceof Error ? err.message : 'Something went wrong.')}</div>`;
 }
@@ -243,6 +249,7 @@ async function runScam() {
     const r = await api<ScamResult>('/api/tools/scam', { text }, t.retry);
     t.stop();
     renderScam(out, r, performance.now() - started, text);
+    reveal(out);
   } catch (e) {
     t.stop();
     showError(out, e);
@@ -388,7 +395,7 @@ async function runXray(id: string) {
     t.stop();
     showError(out, e);
   }
-  out.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  reveal(out);
 }
 
 function renderXray(out: HTMLElement, r: Card, ms: number) {
@@ -544,6 +551,7 @@ async function pickJob(code: string, label: string) {
     t.stop();
     if (r.cached) await countUp(out, r.checks, 900);
     renderJobs(out, r, r.cached ? r.ms : performance.now() - started);
+    reveal(out);
   } catch (e) {
     t.stop();
     showError(out, e);
@@ -553,7 +561,10 @@ async function pickJob(code: string, label: string) {
 function renderJobs(out: HTMLElement, r: JobRes, ms: number) {
   const B = ['Automate', 'Augment', 'Own'];
   const split = B.map(
-    (b) => `<span class="b-${b}" style="width:${(r.split[b] * 100).toFixed(1)}%">${r.split[b] >= 0.12 ? `${b} ${pct(r.split[b])}` : ''}</span>`,
+    (b) =>
+      `<span class="b-${b}" style="width:${(r.split[b] * 100).toFixed(1)}%" title="${b} ${pct(r.split[b])}">${
+        r.split[b] >= 0.28 ? `${b} ${pct(r.split[b])}` : r.split[b] >= 0.08 ? pct(r.split[b]) : ''
+      }</span>`,
   ).join('');
   const col = (b: string) => {
     const ts = r.tasks.filter((t) => t.bucket === b).sort((x, y) => y.p - x.p);
@@ -576,6 +587,7 @@ function renderJobs(out: HTMLElement, r: JobRes, ms: number) {
         r.percentile != null ? `More exposed to AI than <b>${pct(r.percentile)}</b> of jobs.` : `Average exposure ${r.exposure.toFixed(1)} of 5.`
       }</p>
     </div>
+    <p class="credit" style="margin:-4px 0 0">${B.map((b) => `<span class="b-${b}" style="color:var(--c)">■</span> ${b} ${pct(r.split[b])}`).join(' &nbsp; ')}</p>
     <div class="cols">${B.map(col).join('')}</div>
     <p class="credit">Task data: O*NET 31.0 Database, U.S. Department of Labor, ETA (CC BY 4.0).</p>
     ${deeper(
@@ -705,6 +717,7 @@ async function runCustom() {
           return `<div class="panel-d"><h4>${esc(q.q)}</h4>${body}</div>`;
         })
         .join('') + `<p class="speed"><b>${r.checks} checks</b> in ${secs(ms)}</p>`;
+    reveal(out);
   } catch (e) {
     t.stop();
     showError(out, e);

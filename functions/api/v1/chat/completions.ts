@@ -2,7 +2,7 @@
 // Auth is a demo token from /api/token (never the real key). Each token is
 // capped in calls and expires at midnight; the model is limited to the demo's
 // fast models and output length is capped. Streaming is supported.
-import { assertBudget, fail, handler, models, recordSpend, store, type Env, type Usage } from '../../_lib';
+import { assertBudget, fail, handler, models, reasoningFor, recordSpend, store, type Env, type Usage } from '../../_lib';
 
 const MAX_OUT = 4096;
 
@@ -57,6 +57,7 @@ export const onRequestPost = handler(async (ctx) => {
       models: undefined,
       max_tokens: maxTokens,
       max_completion_tokens: undefined,
+      reasoning: payload.reasoning ?? reasoningFor(model),
       provider: { sort: 'latency' },
       usage: { include: true },
     }),

@@ -26,7 +26,10 @@ const qr = await QRCode.toString('https://tylerw.ai/demo', {
   <main class="wall" id="wall">
     <header class="w-head">
       <div class="w-title">
-        <p class="w-eyebrow">System 1, live · ISACA Virginia</p>
+        <div class="w-brand">
+          <img src="/demo-data/brand/isaca-va-rev.png" alt="ISACA Virginia Chapter" />
+          <p class="w-eyebrow">System 1, live · CommunITy Day</p>
+        </div>
         <div class="w-totals">
           <span><b class="mono" id="tDecisions">0</b> decisions</span>
           <span><b class="mono" id="tPeople">0</b> people</span>
@@ -100,6 +103,16 @@ const qr = await QRCode.toString('https://tylerw.ai/demo', {
     justify-content: space-between;
     align-items: center;
     gap: 2vw;
+  }
+  .w-brand {
+    display: flex;
+    align-items: center;
+    gap: 1.4vw;
+  }
+  .w-brand img {
+    height: 3.2vw;
+    min-height: 36px;
+    width: auto;
   }
   .w-eyebrow {
     margin: 0;

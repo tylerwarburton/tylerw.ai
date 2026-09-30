@@ -58,7 +58,7 @@ console.log(r.choices[0].message.content);`;
     <!-- ── Header ─────────────────────────────────────────── -->
     <header class="d-head">
       <div class="marks">
-        <span class="mark">ISACA Virginia</span>
+        <img class="isaca" src="/demo-data/brand/isaca-va-rev.png" alt="ISACA Virginia Chapter" width="162" height="56" />
         <span class="x" aria-hidden="true">×</span>
         <a class="mark mark-site" href="/"><span class="dot" aria-hidden="true"></span>tylerw.ai</a>
       </div>
@@ -327,6 +327,10 @@ Help me build one of these for a real task from my job in security, audit or ris
     gap: 10px;
     font-size: 13px;
     color: var(--d-muted);
+  }
+  .isaca {
+    height: 40px;
+    width: auto;
   }
   .mark {
     border: 1px solid var(--d-border);
@@ -785,6 +789,7 @@ Help me build one of these for a real task from my job in security, audit or ris
     display: none;
   }
   .result {
+    scroll-margin-top: 12px;
     margin-top: 20px;
     display: grid;
     gap: 14px;
@@ -1206,10 +1211,16 @@ Help me build one of these for a real task from my job in security, audit or ris
   }
   .cq-top {
     display: grid;
-    grid-template-columns: 1fr auto;
+    grid-template-columns: 1fr;
     gap: 8px;
   }
+  @media (min-width: 560px) {
+    .cq-top {
+      grid-template-columns: 1fr auto;
+    }
+  }
   .cq select {
+    justify-self: start;
     width: auto;
     font-size: 14px;
     padding: 8px 10px;

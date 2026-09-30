@@ -67,7 +67,10 @@ export const onRequestPost = handler(async (ctx) => {
   await rateLimit(env, device);
   const s = await store(env);
   const cacheKey = `jobs:${code}`;
-  let result = JSON.parse((await s.get(cacheKey)) ?? 'null') as JobResult | null;
+  // Pre-built before the event (scripts/demo-warm.ts), then the store.
+  let result =
+    (await asset<JobResult>(ctx, `/demo-data/jobs/results/${code}.json`)) ??
+    (JSON.parse((await s.get(cacheKey)) ?? 'null') as JobResult | null);
   const cached = !!result;
 
   if (!result) {

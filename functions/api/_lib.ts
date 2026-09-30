@@ -7,8 +7,10 @@
 
 export interface Env {
   OPENROUTER_API_KEY: string;
-  /** Primary fast model, e.g. "openai/gpt-oss-120b". */
+  /** Primary fast model. Defaults to DEFAULT_MODEL. */
   DEMO_MODEL?: string;
+  /** Model for App Privacy X-ray, where careful reading beats raw speed (it is pre-cached). */
+  DEMO_XRAY_MODEL?: string;
   /** Comma-separated fallbacks OpenRouter tries if the primary fails. */
   DEMO_FALLBACK_MODELS?: string;
   /** Models attendees may pick in the passthrough. Comma-separated. */
@@ -24,7 +26,10 @@ export interface Env {
 
 export type Ctx = EventContext<Env, string, unknown>;
 
-export const DEFAULT_MODEL = 'openai/gpt-oss-120b';
+// Benchmarked on the Scam Check prompt (Sep 30, 2026): Mercury 2.5 ~150 ms,
+// gpt-oss-20b ~250 ms, both correct on scam/legit samples.
+export const DEFAULT_MODEL = 'inception/mercury-2.5';
+export const DEFAULT_FALLBACKS = ['openai/gpt-oss-20b', 'openai/gpt-oss-120b'];
 const OPENROUTER = 'https://openrouter.ai/api/v1/chat/completions';
 
 // — HTTP helpers —————————————————————————————————————————————
@@ -195,11 +200,12 @@ export interface Usage {
 
 export function models(env: Env) {
   const primary = env.DEMO_MODEL || DEFAULT_MODEL;
-  const fallbacks = (env.DEMO_FALLBACK_MODELS || '')
-    .split(',')
-    .map((s) => s.trim())
-    .filter(Boolean);
-  return { primary, fallbacks };
+  const fallbacks = env.DEMO_FALLBACK_MODELS
+    ? env.DEMO_FALLBACK_MODELS.split(',')
+        .map((s) => s.trim())
+        .filter(Boolean)
+    : DEFAULT_FALLBACKS;
+  return { primary, fallbacks: fallbacks.filter((m) => m !== primary) };
 }
 
 export async function recordSpend(env: Env, usage: Usage | undefined) {
@@ -208,33 +214,29 @@ export async function recordSpend(env: Env, usage: Usage | undefined) {
   await s.incr('spend', usage.cost);
 }
 
+/** Reasoning settings per model: off where allowed (fastest), minimal otherwise. */
+export function reasoningFor(model: string) {
+  return model.startsWith('inception/') ? { enabled: false } : { effort: 'low', exclude: true };
+}
+
 /**
  * One chat completion against OpenRouter with a JSON-schema response.
- * Retries 429/5xx with jittered backoff, since a whole room hits it at once.
+ * Tries the primary model, then each fallback (each with its own reasoning
+ * setting). 429/5xx get a jittered backoff, since a whole room hits at once.
  */
 export async function completeJson<T>(
   env: Env,
-  opts: { system: string; user: string; schema: object; maxTokens?: number },
+  opts: { system: string; user: string; schema: object; maxTokens?: number; validate?: (data: T) => boolean; model?: string },
 ): Promise<{ data: T; usage?: Usage; model: string; ms: number }> {
   if (!env.OPENROUTER_API_KEY) throw new HttpError(503, 'Demo is not configured yet (no API key).');
   const { primary, fallbacks } = models(env);
-  const payload = {
-    model: primary,
-    ...(fallbacks.length ? { models: [primary, ...fallbacks] } : {}),
-    messages: [
-      { role: 'system', content: opts.system },
-      { role: 'user', content: opts.user },
-    ],
-    temperature: 0,
-    max_tokens: opts.maxTokens ?? 1200,
-    reasoning: { effort: 'low', exclude: true },
-    response_format: { type: 'json_schema', json_schema: { name: 'answers', strict: true, schema: opts.schema } },
-    provider: { sort: 'latency', require_parameters: true },
-    usage: { include: true },
-  };
+  const first = opts.model || primary;
+  // First choice gets two tries; each fallback one. Busy responses back off first.
+  const plan = [first, first, ...fallbacks.filter((m) => m !== first)];
   const started = Date.now();
   let lastErr = '';
-  for (let attempt = 0; attempt < 4; attempt++) {
+  for (let attempt = 0; attempt < plan.length; attempt++) {
+    const model = plan[attempt];
     const res = await fetch(OPENROUTER, {
       method: 'POST',
       headers: {
@@ -243,27 +245,45 @@ export async function completeJson<T>(
         'HTTP-Referer': 'https://tylerw.ai/demo',
         'X-Title': 'tylerw.ai demo',
       },
-      body: JSON.stringify(payload),
+      body: JSON.stringify({
+        model,
+        messages: [
+          { role: 'system', content: opts.system },
+          { role: 'user', content: opts.user },
+        ],
+        temperature: 0,
+        max_tokens: opts.maxTokens ?? 1200,
+        reasoning: reasoningFor(model),
+        response_format: { type: 'json_schema', json_schema: { name: 'answers', strict: true, schema: opts.schema } },
+        provider: { sort: 'latency', require_parameters: true },
+        usage: { include: true },
+      }),
     });
     if (res.ok) {
       const out = (await res.json()) as {
         model: string;
         usage?: Usage;
-        choices?: { message?: { content?: string } }[];
+        choices?: { message?: { content?: string }; finish_reason?: string }[];
       };
       const text = out.choices?.[0]?.message?.content ?? '';
+      const finish = out.choices?.[0]?.finish_reason;
       await recordSpend(env, out.usage);
+      let data: T;
       try {
-        return { data: JSON.parse(extractJson(text)) as T, usage: out.usage, model: out.model, ms: Date.now() - started };
+        data = JSON.parse(extractJson(text)) as T;
       } catch {
-        lastErr = 'model returned malformed JSON';
+        lastErr = `${model}: malformed JSON (finish: ${finish}, ${text.length} chars)`;
         continue;
       }
+      if (opts.validate && !opts.validate(data)) {
+        lastErr = `${model}: answers failed validation`;
+        continue;
+      }
+      return { data, usage: out.usage, model: out.model, ms: Date.now() - started };
     }
-    lastErr = `${res.status} ${(await res.text()).slice(0, 200)}`;
+    lastErr = `${model}: ${res.status} ${(await res.text()).slice(0, 200)}`;
     if (res.status === 402) throw new HttpError(402, 'Demo budget reached. Thanks for playing!');
-    if (res.status !== 429 && res.status < 500) break;
-    await sleep(300 * 2 ** attempt + Math.random() * 400);
+    if (res.status === 429 || res.status >= 500) await sleep(250 * 2 ** Math.min(attempt, 3) + Math.random() * 300);
   }
   console.error('openrouter failed:', lastErr);
   throw new HttpError(503, 'The room is busy. Trying again in a moment usually works.', { retryAfter: 2 });
@@ -307,27 +327,26 @@ export type Answer = number | Record<string, number>;
 
 export const JUDGE_SYSTEM = [
   'You are System 1: a fast, calibrated judgment engine.',
-  'For every question, answer with probabilities, not prose.',
-  '- yes/no questions: the probability (0 to 1) that the answer is yes.',
-  '- choice and score questions: a probability for every option, summing to 1.',
-  'Be calibrated: use values near 0 or 1 only when the evidence is clear; use the middle when it is genuinely ambiguous.',
-  'Return only JSON that matches the schema.',
+  'Answer every question with whole-number percentages (0-100), not prose.',
+  '- yes/no questions: one number, the chance the answer is yes.',
+  '- choice and score questions: an array with one number per option, in the order listed, summing to about 100.',
+  'Be calibrated: use values near 0 or 100 only when the evidence is clear; use the middle when it is genuinely ambiguous.',
+  'Return only compact JSON that matches the schema.',
 ].join('\n');
+
+function optionCount(q: Question) {
+  return q.type === 'noul' ? 1 : q.type === 'choice' ? q.options.length : q.levels.length;
+}
 
 /** JSON schema for one set of answers, keyed by question key. */
 export function answerSchema(questions: Record<string, Question>) {
   const properties: Record<string, object> = {};
   for (const [k, q] of Object.entries(questions)) {
-    if (q.type === 'noul') properties[k] = { type: 'number' };
-    else {
-      const opts = q.type === 'choice' ? q.options : q.levels.map((_, i) => String(i + 1));
-      properties[k] = {
-        type: 'object',
-        properties: Object.fromEntries(opts.map((o, i) => [`o${i}`, { type: 'number' }])),
-        required: opts.map((_, i) => `o${i}`),
-        additionalProperties: false,
-      };
-    }
+    const n = optionCount(q);
+    properties[k] =
+      q.type === 'noul'
+        ? { type: 'integer' }
+        : { type: 'array', items: { type: 'integer' }, minItems: n, maxItems: n };
   }
   return { type: 'object', properties, required: Object.keys(questions), additionalProperties: false };
 }
@@ -337,26 +356,36 @@ export function describe(questions: Record<string, Question>) {
   return Object.entries(questions)
     .map(([k, q]) => {
       if (q.type === 'noul') return `${k} (yes/no): ${q.q}${q.hint ? ` (${q.hint})` : ''}`;
-      if (q.type === 'choice') return `${k} (choice): ${q.q}\n${q.options.map((o, i) => `   o${i} = ${o}`).join('\n')}`;
-      return `${k} (score 1-5): ${q.q}\n${q.levels.map((l, i) => `   o${i} = ${i + 1}: ${l}`).join('\n')}`;
+      if (q.type === 'choice') return `${k} (choice, ${q.options.length} numbers): ${q.q}\n${q.options.map((o, i) => `   ${i + 1}. ${o}`).join('\n')}`;
+      return `${k} (score, 5 numbers for levels 1-5): ${q.q}\n${q.levels.map((l, i) => `   ${i + 1}. ${l}`).join('\n')}`;
     })
     .join('\n');
 }
 
-/** Map raw model output back to real option names, clamped and normalized. */
+/** True when every answer is present and usable (a number, or a non-zero array of the right length). */
+export function valid(questions: Record<string, Question>, raw: Record<string, unknown> | undefined) {
+  if (!raw) return false;
+  return Object.entries(questions).every(([k, q]) => {
+    const v = raw[k];
+    if (q.type === 'noul') return Number.isFinite(Number(v));
+    return Array.isArray(v) && v.length === optionCount(q) && v.some((x) => Number(x) > 0);
+  });
+}
+
+/** Map raw model output (percentages) back to real option names, normalized to 0..1. */
 export function normalize(questions: Record<string, Question>, raw: Record<string, unknown>) {
   const out: Record<string, Answer> = {};
   for (const [k, q] of Object.entries(questions)) {
     const v = raw?.[k];
     if (q.type === 'noul') {
-      out[k] = clamp01(Number(v));
+      out[k] = clamp01(Number(v) / 100);
       continue;
     }
     const opts = q.type === 'choice' ? q.options : q.levels.map((_, i) => String(i + 1));
-    const obj = (v && typeof v === 'object' ? v : {}) as Record<string, unknown>;
-    const ps = opts.map((_, i) => Math.max(0, Number(obj[`o${i}`]) || 0));
-    const sum = ps.reduce((a, b) => a + b, 0) || 1;
-    out[k] = Object.fromEntries(opts.map((o, i) => [o, ps[i] / sum]));
+    const arr = Array.isArray(v) ? v : [];
+    const ps = opts.map((_, i) => Math.max(0, Number(arr[i]) || 0));
+    const sum = ps.reduce((a, b) => a + b, 0);
+    out[k] = Object.fromEntries(opts.map((o, i) => [o, sum ? ps[i] / sum : 1 / opts.length]));
   }
   return out;
 }
@@ -371,21 +400,41 @@ export async function judge(env: Env, input: string, questions: Record<string, Q
     system: JUDGE_SYSTEM,
     user: `${context ? `${context}\n\n` : ''}INPUT:\n"""\n${input}\n"""\n\nQUESTIONS:\n${describe(questions)}`,
     schema: answerSchema(questions),
-    maxTokens: 900,
+    maxTokens: 1500,
+    validate: (d) => valid(questions, d),
   });
   return { answers: normalize(questions, r.data), usage: r.usage, model: r.model, ms: r.ms };
 }
 
 /**
- * Ask the same yes/no-style questions of many short items in one call.
- * Returns one answer map per item, in order.
+ * Ask the same questions of many short items in one call. Items the model
+ * skipped are asked again once, on their own batch.
  */
 export async function judgeMany(
   env: Env,
   items: string[],
   questions: Record<string, Question>,
   context: string,
-) {
+  model?: string,
+): Promise<{ answers: Record<string, Answer>[]; ms: number; model: string }> {
+  const started = Date.now();
+  const got = new Map<number, Record<string, unknown>>();
+  let used = '';
+  let pending = items.map((_, i) => i);
+  for (let round = 0; round < 2 && pending.length; round++) {
+    const r = await askBatch(env, pending.map((i) => items[i]), questions, context, model);
+    used = r.model;
+    r.rows.forEach((row, j) => row && got.set(pending[j], row));
+    pending = pending.filter((i) => !got.has(i));
+  }
+  return {
+    answers: items.map((_, i) => normalize(questions, got.get(i) ?? {})),
+    ms: Date.now() - started,
+    model: used,
+  };
+}
+
+async function askBatch(env: Env, items: string[], questions: Record<string, Question>, context: string, model?: string) {
   const itemSchema = answerSchema(questions) as { properties: Record<string, object>; required: string[] };
   const schema = {
     type: 'object',
@@ -405,16 +454,24 @@ export async function judgeMany(
   };
   const r = await completeJson<{ items: Record<string, unknown>[] }>(env, {
     system: JUDGE_SYSTEM,
-    user: `${context}\n\nAnswer every question for EVERY numbered item. Return one entry per item with its number as "i".\n\nQUESTIONS:\n${describe(questions)}\n\nITEMS:\n${items
+    user: `${context}\n\nAnswer every question for EVERY numbered item (${items.length} items, numbered 0 to ${items.length - 1}). Return one entry per item with its number as "i".\n\nQUESTIONS:\n${describe(questions)}\n\nITEMS:\n${items
       .map((t, i) => `[${i}] ${t}`)
       .join('\n')}`,
     schema,
-    maxTokens: 400 + items.length * Object.keys(questions).length * 14,
+    // Generous: only used tokens are billed, and truncation breaks the JSON.
+    maxTokens: 1200 + items.length * (numbersPer(questions) * 6 + 20),
+    // Missing items are re-asked by judgeMany; malformed ones fail the batch.
+    validate: (d) => (d.items ?? []).every((it) => valid(questions, it)),
+    model,
   });
   const byIndex = new Map<number, Record<string, unknown>>();
   for (const it of r.data.items ?? []) byIndex.set(Number(it.i), it);
-  const answers = items.map((_, i) => normalize(questions, byIndex.get(i) ?? {}));
-  return { answers, usage: r.usage, model: r.model, ms: r.ms };
+  return { rows: items.map((_, i) => byIndex.get(i)), model: r.model };
+}
+
+/** How many numbers one item's answers contain (yes/no = 1, choice = n, score = 5). */
+function numbersPer(questions: Record<string, Question>) {
+  return Object.values(questions).reduce((a, q) => a + optionCount(q), 0);
 }
 
 export function top(dist: Answer): [string, number] {
