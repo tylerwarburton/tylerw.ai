@@ -29,3 +29,7 @@ Thumbs.db
 # local scratch
 _branding_extract/
 *.zip
+
+# Local secrets for wrangler pages dev
+.dev.vars
+.wrangler/

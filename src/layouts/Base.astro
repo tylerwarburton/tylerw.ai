@@ -5,10 +5,13 @@ import { site } from '../data/site';
 interface Props {
   title?: string;
   description?: string;
+  /** Keep the page out of search engines (e.g. the unlisted /demo). */
+  noindex?: boolean;
 }
 const {
   title = `${site.name} · ${site.eyebrow}`,
   description = site.description,
+  noindex = false,
 } = Astro.props;
 
 const canonical = new URL(Astro.url.pathname, Astro.site ?? `https://${site.domain}`);
@@ -41,6 +44,8 @@ const canonical = new URL(Astro.url.pathname, Astro.site ?? `https://${site.doma
     <meta name="twitter:description" content={description} />
 
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    {noindex && <meta name="robots" content="noindex, nofollow" />}
+    <slot name="head" />
   </head>
   <body>
     <slot />
