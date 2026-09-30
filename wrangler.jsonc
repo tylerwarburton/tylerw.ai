@@ -1,0 +1,25 @@
+// Cloudflare Worker for tylerw.ai: the static Astro site plus the /demo API.
+// Secrets (set in the dashboard: Workers → tylerw-ai → Settings → Variables
+// and Secrets, or `npx wrangler secret put NAME`):
+//   OPENROUTER_API_KEY   required for /demo
+//   DEMO_ADMIN_KEY       presenter key for /demo/wall (F freeze, R reset)
+// Optional plain variables: DEMO_SPEND_CAP (USD, default 45), DEMO_MODEL,
+// DEMO_FALLBACK_MODELS, DEMO_XRAY_MODEL.
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "tylerw-ai",
+  "main": "worker/index.ts",
+  "compatibility_date": "2026-09-01",
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "run_worker_first": ["/api/*"]
+  },
+  "durable_objects": {
+    "bindings": [{ "name": "ROOM", "class_name": "RoomStore" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["RoomStore"] }],
+  // Keep variables added in the dashboard across deploys.
+  "keep_vars": true,
+  "observability": { "enabled": true }
+}

@@ -1,36 +1,50 @@
 # /demo setup (System 1, live)
 
-Unlisted pages: `/demo` (phones) and `/demo/wall` (projector). The API is
-Cloudflare Pages Functions in `functions/api/`, deployed with the site.
+Unlisted pages: `/demo` (phones) and `/demo/wall` (projector). The site deploys
+as the **tylerw-ai Worker** (Cloudflare Workers Builds): `wrangler.jsonc` serves
+the static Astro build from `dist/` and routes `/api/*` to `worker/index.ts`,
+which runs the handlers in `functions/api/`. Shared state (tokens, spend, rate
+limits, the room wall) lives in one Durable Object, created automatically on
+deploy. There is no database to set up.
 
-## One-time Cloudflare setup (Pages project → Settings)
+## One-time setup
 
-1. **Variables and Secrets** (Production):
-   - `OPENROUTER_API_KEY`: secret. Set a credit limit on the key itself in
-     OpenRouter ($10 for testing, $50 for the event); that is the hard cap.
-   - `DEMO_SPEND_CAP`: soft cap in USD, e.g. `9` for the test key, `45` for the
-     event key. The demo shows "budget reached" at this number.
-   - `DEMO_ADMIN_KEY`: any long random string. Open the wall as
-     `/demo/wall?key=<this>` to enable F (freeze) and R (reset).
-   - `DEMO_MODEL` (optional): the fast model; defaults to `inception/mercury-2.5`.
-   - `DEMO_FALLBACK_MODELS` (optional): comma-separated backups.
-2. **Bindings → D1 database**: create a D1 database (e.g. `tylerw-demo`) and
-   bind it as `DEMO_DB`. Tables are created automatically on first request.
-   Without it, each Cloudflare isolate keeps its own memory and the wall,
-   tokens and spend tracking are not shared.
-3. Redeploy (push to `main`, or "Retry deployment").
+Cloudflare dashboard → **Workers & Pages → tylerw-ai → Settings → Variables and
+Secrets**, add (type **Secret**):
+
+- `OPENROUTER_API_KEY`: the OpenRouter key. Put a credit limit on the key in
+  OpenRouter; that is the hard cap.
+- `DEMO_ADMIN_KEY`: any long random string. Open the wall as
+  `/demo/wall?key=<this>` to enable **F** (freeze) and **R** (reset).
+
+Optional (type **Text**): `DEMO_SPEND_CAP` (USD, default 45; the page shows
+"budget reached" there), `DEMO_MODEL` (default `inception/mercury-2.5`),
+`DEMO_FALLBACK_MODELS`, `DEMO_XRAY_MODEL` (default `openai/gpt-oss-120b`).
+
+Secrets take effect immediately; no redeploy needed. `keep_vars` in
+`wrangler.jsonc` keeps dashboard variables across deploys.
 
 ## Before the talk
 
 - Open `/demo/wall?key=…` on the projector and press **R** to clear test data.
-- Warm caches: run every X-ray app and the six Job Radar chips once.
+- Caches are pre-built: every Job Radar occupation (`public/demo-data/jobs/results`)
+  and every X-ray app (`public/demo-data/xray/results`). Rebuild with
+  `scripts/demo-warm.ts` if questions change.
 
 ## Local development
 
 ```bash
 printf 'OPENROUTER_API_KEY=sk-or-...\nDEMO_ADMIN_KEY=localadmin\nDEMO_SPEND_CAP=9\n' > .dev.vars
 npm run build
-npx wrangler pages dev dist --d1 DEMO_DB=demo-local
+npx wrangler dev
+```
+
+Rebuild the caches (from the repo root):
+
+```bash
+npx esbuild scripts/demo-warm.ts --bundle --platform=node --format=esm --outfile=/tmp/warm.mjs
+OPENROUTER_API_KEY=sk-or-... node /tmp/warm.mjs jobs      # all occupations + percentile baseline
+OPENROUTER_API_KEY=sk-or-... node /tmp/warm.mjs xray      # every app policy
 ```
 
 ## Endpoints
