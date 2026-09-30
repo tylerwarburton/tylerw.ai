@@ -252,7 +252,7 @@ export async function completeJson<T>(
   env: Env,
   opts: { system: string; user: string; schema: object; maxTokens?: number; validate?: (data: T) => boolean; model?: string },
 ): Promise<{ data: T; usage?: Usage; model: string; ms: number }> {
-  if (!env.OPENROUTER_API_KEY) throw new HttpError(503, 'Demo is not configured yet (no API key).');
+  if (!env.OPENROUTER_API_KEY) throw new HttpError(501, 'The demo is not switched on yet. Check back in a minute.');
   const { primary, fallbacks } = models(env);
   const first = opts.model || primary;
   // First choice gets two tries; each fallback one. Busy responses back off first.
