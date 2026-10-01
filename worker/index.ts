@@ -12,6 +12,7 @@ import * as token from '../functions/api/token';
 import * as wall from '../functions/api/wall';
 import * as chat from '../functions/api/v1/chat/completions';
 import * as models from '../functions/api/v1/models';
+import * as appSearch from '../functions/api/apps/search';
 
 type Handler = (ctx: never) => Promise<Response>;
 const routes: Record<string, Handler | undefined> = {
@@ -24,6 +25,7 @@ const routes: Record<string, Handler | undefined> = {
   'POST /api/wall': wall.onRequestPost,
   'POST /api/v1/chat/completions': chat.onRequestPost,
   'GET /api/v1/models': models.onRequestGet,
+  'GET /api/apps/search': appSearch.onRequestGet,
 };
 
 export default {

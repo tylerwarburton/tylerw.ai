@@ -9,6 +9,10 @@ export interface Env {
   OPENROUTER_API_KEY: string;
   /** Primary fast model. Defaults to DEFAULT_MODEL. */
   DEMO_MODEL?: string;
+  /** Optional separate OpenRouter key handed to attendees in the Build panel. */
+  DEMO_SHARED_KEY?: string;
+  /** Optional r.jina.ai key (raises the reader's rate limit for any-app X-ray). */
+  JINA_API_KEY?: string;
   /** Model for App Privacy X-ray, where careful reading beats raw speed (it is pre-cached). */
   DEMO_XRAY_MODEL?: string;
   /** Comma-separated fallbacks OpenRouter tries if the primary fails. */
