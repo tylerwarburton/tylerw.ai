@@ -11,10 +11,8 @@ import Icon from './Icon.astro';
 
   <div class="container hero-inner">
     <div class="hero-copy">
-      <p class="eyebrow reveal">{site.eyebrow}</p>
       <h1 class="hero-name reveal">{site.name}</h1>
       <p class="hero-headline reveal">{site.headline}</p>
-      <p class="hero-tagline reveal">{site.tagline}</p>
       <div class="hero-actions reveal">
         <a class="btn btn-primary" href="/projects">
           See my work <Icon name="arrow-right" size={16} />
@@ -118,7 +116,7 @@ import Icon from './Icon.astro';
     letter-spacing: -0.03em;
     line-height: 1;
     color: var(--ag-text-bright);
-    margin-top: 16px;
+    margin-top: 0;
   }
   .hero-headline {
     margin-top: 14px;
@@ -129,13 +127,6 @@ import Icon from './Icon.astro';
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
-  }
-  .hero-tagline {
-    font-size: clamp(15px, 1.8vw, 18px);
-    color: var(--ag-muted);
-    line-height: 1.6;
-    max-width: 46ch;
-    margin-top: 16px;
   }
   .hero-actions {
     display: flex;
