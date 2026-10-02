@@ -354,14 +354,19 @@ export const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 export async function pool<T, R>(items: T[], limit: number, fn: (item: T, i: number) => Promise<R>): Promise<R[]> {
   const out: R[] = new Array(items.length);
   let next = 0;
+  let failed = false;
+  let failure: unknown;
   await Promise.all(
     Array.from({ length: Math.min(limit, items.length) }, async () => {
-      while (next < items.length) {
+      while (!failed && next < items.length) {
         const i = next++;
-        out[i] = await fn(items[i], i);
+        try { out[i] = await fn(items[i], i); }
+        catch (error) { failed = true; failure ??= error; }
       }
     }),
   );
+  // Finish already-started calls so the response includes their real usage.
+  if (failed) throw failure;
   return out;
 }
 

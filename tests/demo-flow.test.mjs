@@ -48,3 +48,15 @@ test('missing provider cost is marked incomplete, including paid malformed retri
   const result=await res.json();assert.equal(res.status,200);assert.equal(result.runUsage.costUsd,.002);assert.equal(result.runUsage.costComplete,false);assert.equal(result.runUsage.calls,2);
  }finally {globalThis.fetch=originalFetch;}
 });
+await build({entryPoints:['functions/api/_lib.ts'],bundle:true,platform:'node',format:'esm',outfile:join(dir,'lib.mjs')});
+const {pool}=await import(pathToFileURL(join(dir,'lib.mjs')));
+test('failed parallel checks settle in-flight usage and stop new work',async()=>{
+ let release;
+ const pending=new Promise(r=>release=r);
+ let finished=false;
+ const started=[];
+ const run=pool([0,1,2,3],2,async i=>{started.push(i);if(i===0)throw Error('failed check');await pending;finished=true;return i;});
+ await Promise.resolve();await Promise.resolve();
+ assert.deepEqual(started,[0,1]);assert.equal(finished,false);
+ release();await assert.rejects(run,/failed check/);assert.equal(finished,true);
+});
