@@ -33,29 +33,40 @@ class ApiError extends Error {
   constructor(
     public status: number,
     message: string,
+    public runUsage?: RunUsage,
   ) {
     super(message);
   }
 }
 
-async function api<T>(path: string, payload: unknown, onRetry?: (msg: string) => void): Promise<T> {
+interface RunUsage { costUsd:number; costComplete:boolean; elapsedMs:number; calls:number; inputTokens:number; outputTokens:number }
+function receipt(r: {runUsage?:RunUsage}) {
+  const u = r.runUsage;
+  if (!u) return '';
+  return `<div class="run-receipt"><span>${u.costComplete ? '' : 'Reported portion: '}$${u.costUsd.toFixed(6)} USD${u.costComplete ? '' : ' · cost incomplete'}</span><span>${secs(u.elapsedMs)} total time</span><span>${fmt(u.inputTokens + u.outputTokens)} tokens</span></div>`;
+}
+async function api<T>(path: string, payload: unknown, onRetry?: (msg: string) => void): Promise<T & {runUsage:RunUsage}> {
+  const started = performance.now();
+  const usage:RunUsage = {costUsd:0,costComplete:true,elapsedMs:0,calls:0,inputTokens:0,outputTokens:0};
   for (let attempt = 0; ; attempt++) {
-    const res = await fetch(path, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', 'x-device-id': deviceId() },
-      body: JSON.stringify(payload),
-    }).catch(() => null);
-    if (res?.ok) return (await res.json()) as T;
+    const res = await fetch(path, { method:'POST', headers:{'content-type':'application/json','x-device-id':deviceId()}, body:JSON.stringify(payload) }).catch(() => null);
     const data = res ? await res.json().catch(() => ({})) : {};
+    if (data.runUsage) {
+      const u = data.runUsage;
+      usage.costUsd += u.costUsd; usage.calls += u.calls;
+      usage.inputTokens += u.inputTokens; usage.outputTokens += u.outputTokens;
+      usage.costComplete &&= u.costComplete;
+    } else if (!res) usage.costComplete = false;
+    usage.elapsedMs = performance.now() - started;
+    void pollPersonal();
+    if (res?.ok) return {...data,runUsage:usage};
     const status = res?.status ?? 0;
-    const retryable = status === 0 || status === 429 || status === 503;
-    if (retryable && attempt < 3) {
-      const wait = 2 + attempt;
-      onRetry?.(`The room is busy, trying again in ${wait} s…`);
-      await new Promise((r) => setTimeout(r, wait * 1000));
-      continue;
+    // A lost response might already have incurred cost: do not repeat it automatically.
+    if ((status === 429 || status === 503) && attempt < 2) {
+      onRetry?.('The room is busy. Trying again…');
+      await new Promise(r => setTimeout(r,(attempt+2)*1000)); continue;
     }
-    throw new ApiError(status, (data as { error?: string }).error || 'Something went wrong. Try again.');
+    throw new ApiError(status,data.error || 'Connection interrupted. Please try again.',usage);
   }
 }
 
@@ -126,7 +137,7 @@ function reveal(el: HTMLElement) {
 }
 
 function showError(el: HTMLElement, err: unknown) {
-  el.innerHTML = `<div class="err">${esc(err instanceof Error ? err.message : 'Something went wrong.')}</div>`;
+  el.innerHTML = `<div class="err">${esc(err instanceof Error ? err.message : 'Something went wrong.')}</div>${err instanceof ApiError ? receipt(err) : ''}`;
 }
 
 const hue = (s: string) => [...s].reduce((a, c) => (a * 31 + c.charCodeAt(0)) % 360, 7);
@@ -151,33 +162,47 @@ interface ScamResult {
   ms: number;
 }
 
-$('#scamText').addEventListener('keydown', (e) => {
-  if (e.key === 'Enter' && !e.shiftKey) {
-    e.preventDefault();
-    void runScam();
-  }
+type EmailCheck = {stage:string; label?:string; pass:boolean; stopped:boolean; band?:string; likelihood?:number; runUsage?:RunUsage};
+const emailStages = ['scam','spam','priority'];
+let emailResults:EmailCheck[] = [];
+let emailText = '';
+let emailBusy = false;
+let emailError = '';
+let emailFailureUsage:RunUsage|undefined;
+function renderEmail() {
+  const usages=[...emailResults.map(r=>r.runUsage),emailFailureUsage].filter((u):u is RunUsage=>!!u);
+  const total=usages.reduce((a,u)=>({costUsd:a.costUsd+u.costUsd,elapsedMs:a.elapsedMs+u.elapsedMs,costComplete:a.costComplete&&u.costComplete,calls:a.calls+u.calls,inputTokens:a.inputTokens+u.inputTokens,outputTokens:a.outputTokens+u.outputTokens}),{costUsd:0,elapsedMs:0,costComplete:true,calls:0,inputTokens:0,outputTokens:0});
+  $('#scamOut').innerHTML = emailStages.map((stage,i) => {
+    const r = emailResults[i];
+    const blocked = emailResults.some(x => x.stopped);
+    const label = r ? r.label || (r.band === 'legit' ? 'No strong scam signals' : r.band === 'scam' ? 'Likely scam' : 'Uncertain — verify the sender') : blocked ? 'Not run — an earlier check stopped the sequence' : emailBusy && i === emailResults.length ? 'Running live…' : 'Not run';
+    return `<section class="email-stage" data-state="${r ? r.stopped ? 'stop' : 'pass' : 'pending'}"><h3>${i+1}. ${stage[0].toUpperCase()+stage.slice(1)}</h3><p>${esc(label)}</p>${r?.likelihood != null ? `<p>Estimated scam likelihood: ${pct(r.likelihood)}</p>` : ''}${r ? receipt(r) : ''}</section>`;
+  }).join('') + (usages.length ? '<h4>This sequence</h4>'+receipt({runUsage:total}) : '') + (emailError ? `<div class="err">${esc(emailError)}</div>` : '') + '<p class="credit">Text-only AI assessment. It cannot authenticate a sender or verify links. Confirm sensitive requests through a trusted channel.</p>';
+  $<HTMLButtonElement>('#scamGo').disabled = emailBusy || emailResults.some(r => r.stopped) || emailResults.length === 3;
+  $<HTMLButtonElement>('#scamNext').disabled = $<HTMLButtonElement>('#scamGo').disabled;
+}
+$('#scamText').addEventListener('input',() => {
+  if (emailBusy) return;
+  emailResults=[]; emailError=''; emailFailureUsage=undefined; renderEmail();
 });
-$('#scamGo').addEventListener('click', () => void runScam());
-
-async function runScam() {
-  const text = $<HTMLTextAreaElement>('#scamText').value.trim();
-  const out = $('#scamOut');
-  if (text.length < 8) return toast('Paste a message first');
-  const btn = $<HTMLButtonElement>('#scamGo');
-  btn.disabled = true;
-  const t = ticker(out, 12, '12 questions, one call', 700);
-  const started = performance.now();
+$('#scamGo').addEventListener('click',() => void runEmail(true));
+$('#scamNext').addEventListener('click',() => void runEmail(false));
+async function runEmail(all:boolean) {
+  if (emailBusy) return;
+  const input = $<HTMLTextAreaElement>('#scamText');
+  const text = input.value.trim();
+  if (text.length < 8) return toast('Paste an email first');
+  if (text !== emailText) {emailResults=[]; emailText=text;}
+  emailBusy=true; input.disabled=true; emailError=''; renderEmail();
   try {
-    const r = await api<ScamResult>('/api/tools/scam', { text }, t.retry);
-    t.stop();
-    renderScam(out, r, performance.now() - started, text);
-    reveal(out);
-  } catch (e) {
-    t.stop();
-    showError(out, e);
-  } finally {
-    btn.disabled = false;
-  }
+    do {
+      const stage=emailStages[emailResults.length];
+      if (!stage || emailResults.some(r => r.stopped)) break;
+      const r=await api<EmailCheck>('/api/tools/scam',{text,stage});
+      emailResults.push(r); renderEmail();
+    } while(all);
+  } catch(e) {emailError=e instanceof Error ? e.message : 'Check failed. Try again.'; if(e instanceof ApiError) emailFailureUsage=e.runUsage;}
+  finally {emailBusy=false;input.disabled=false;renderEmail();}
 }
 
 function renderScam(out: HTMLElement, r: ScamResult, roundTrip: number, text: string) {
@@ -288,7 +313,7 @@ async function searchStore(query: string, version: number) {
     const matches = data.apps as StoreMatch[];
     $('#storeMatches').innerHTML = `<h5>App Store · live policy check</h5>${matches.length
       ? `<p class="muted">Live analysis usually takes 10–40 seconds. Some publishers block policy readers.</p><div class="tiles">${matches.map((a) =>
-        `<button class="tile" data-store="${esc(a.id)}" data-name="${esc(a.name)}" title="${esc(a.seller)}">${appIcon(a.icon, a.name)}<span class="app-copy"><b>${esc(a.name)}</b><small class="muted">${esc(a.seller)}</small></span></button>`).join('')}</div>`
+        `<button class="tile" data-store="${esc(a.id)}" data-name="${esc(a.name)}" data-icon="${esc(a.icon || '')}" title="${esc(a.seller)}">${appIcon(a.icon, a.name)}<span class="app-copy"><b>${esc(a.name)}</b><small class="muted">${esc(a.seller)}</small></span></button>`).join('')}</div>`
       : '<p class="muted">No matches. Try another app name.</p>'}`;
   } catch (err) {
     if (controller.signal.aborted || version !== searchVersion) return;
@@ -307,10 +332,10 @@ $('#appPicker').addEventListener('click', (e) => {
   const target = e.target as Element;
   if (target.closest('[data-search-retry]')) return renderPicker($<HTMLInputElement>('#appSearch').value);
   const b = target.closest<HTMLElement>('[data-store]');
-  if (b) void runXray(b.dataset.store!, b.dataset.name);
+  if (b) void runXray(b.dataset.store!, b.dataset.name, b.dataset.icon);
 });
 
-async function runXray(id: string, name?: string) {
+async function runXray(id: string, name?: string, icon?:string) {
   const version = ++xrayVersion;
   clearTimeout(searchTimer);
   searchController?.abort();
@@ -318,17 +343,19 @@ async function runXray(id: string, name?: string) {
   const out = $('#xrayOut');
   $('#appPicker').hidden = true;
   const label = name || 'This app';
-  out.innerHTML = `<div class="panel-d" role="status"><h3>${esc(label)}</h3><p class="muted">Reading the privacy policy and running live checks… Usually 10–40 seconds.</p></div>`;
+  out.innerHTML = `<div class="panel-d" role="status"><div class="app-brand">${appIcon(icon,label)}<h3>${esc(label)}</h3></div><p class="muted">Reading the privacy policy and running live checks… Usually 10–40 seconds.</p></div>`;
   const started = performance.now();
   try {
     const r = await api<Card>('/api/tools/xray', { store: id }, (msg) => {
-      if (version === xrayVersion) out.innerHTML = `<div class="panel-d" role="status">${esc(msg)}</div>`;
+      if (version === xrayVersion) out.innerHTML = `<div class="panel-d" role="status"><div class="app-brand">${appIcon(icon,label)}<h3>${esc(label)}</h3></div>${esc(msg)}</div>`;
     });
     if (version !== xrayVersion) return;
-    renderXray(out, r, performance.now() - started);
+    renderXray(out, r, performance.now() - started, icon);
+    out.insertAdjacentHTML('beforeend',receipt(r));
   } catch (e) {
     if (version !== xrayVersion) return;
     showError(out, e);
+    out.insertAdjacentHTML('afterbegin', `<div class="app-brand">${appIcon(icon,label)}<h3>${esc(label)}</h3></div>`);
     out.insertAdjacentHTML('beforeend', '<button class="btn-d" id="xrayBack">Choose another app</button>');
     $('#xrayBack').addEventListener('click', () => {
       out.innerHTML = '';
@@ -338,7 +365,7 @@ async function runXray(id: string, name?: string) {
   reveal(out);
 }
 
-function renderXray(out: HTMLElement, r: Card, ms: number | null) {
+function renderXray(out: HTMLElement, r: Card, ms: number | null, icon?:string) {
   const risky = r.rows.filter((x) => !x.good && x.p >= 0.6).sort((a, b) => b.p - a.p);
   const light = (x: Card['rows'][number]) =>
     x.good
@@ -354,7 +381,7 @@ function renderXray(out: HTMLElement, r: Card, ms: number | null) {
           : 'var(--d-good)';
   out.innerHTML = `
     <div class="panel-d">
-      <div class="x-head"><span class="mono-g" style="--h:${hue(r.name)}">${esc(initials(r.name))}</span>
+      <div class="x-head">${appIcon(icon,r.name)}
         <div><h3>${esc(r.name)}</h3><p>Policy ${esc(r.updated || 'date not stated')} · <a href="${esc(r.url)}" target="_blank" rel="noopener">source</a></p></div></div>
       <p class="speed" style="margin:12px 0 0"><b>${fmt(r.clauses)} clauses × 12 questions = ${fmt(r.checks)} checks</b> ${ms == null ? '' : `· live in ${secs(ms)}`}</p>
     </div>
@@ -404,8 +431,23 @@ interface JobRes {
   cached: boolean;
 }
 
+function setJobStep(step:string) {
+  $('#jobContext').hidden=step !== 'context';
+  $('#jobReview').hidden=step !== 'review';
+  $('#jobsOut').hidden=step === 'context';
+  $$('[data-job-step]').forEach(el => {
+    if(el.dataset.jobStep === step) el.setAttribute('aria-current','step'); else el.removeAttribute('aria-current');
+  });
+}
+function countJobInputs() {
+  $('#jobCharCount').textContent=`${fmt($<HTMLTextAreaElement>('#jobProfile').value.length)} / 40,000`;
+  $('#jobTaskCount').textContent=`${$<HTMLTextAreaElement>('#jobTasks').value.split('\n').filter(x=>x.trim()).length} tasks`;
+}
+$('#jobProfile').addEventListener('input',countJobInputs);
+$('#jobTasks').addEventListener('input',countJobInputs);
+$('#jobBackContext').addEventListener('click',()=>setJobStep('context'));
 $('#manualJob').addEventListener('click', () => {
-  $('#jobReview').hidden = false;
+  setJobStep('review');
   reveal($('#jobReview'));
 });
 $('#extractJob').addEventListener('click', async () => {
@@ -419,9 +461,11 @@ $('#extractJob').addEventListener('click', async () => {
     const r = await api<{ title: string; tasks: string[] }>('/api/tools/jobs', { action: 'extract', profile }, t.retry);
     $<HTMLInputElement>('#jobSearch').value = r.title;
     $<HTMLTextAreaElement>('#jobTasks').value = r.tasks.join('\n');
-    $('#jobReview').hidden = false;
+    setJobStep('review');
     $('#jobsOut').innerHTML = '';
     out.innerHTML = '';
+    $('#jobReview').insertAdjacentHTML('beforeend',receipt(r));
+    countJobInputs();
     reveal($('#jobReview'));
   } catch (e) { showError(out, e); }
   finally { btn.disabled = false; }
@@ -438,49 +482,36 @@ $('#jobsGo').addEventListener('click', async () => {
   try {
     const r = await api<JobRes>('/api/tools/jobs', { title, tasks }, t.retry);
     renderJobs(out, r, performance.now() - started);
+    out.insertAdjacentHTML('beforeend',receipt(r));
+    setJobStep('results');
     reveal(out);
   } catch (e) { showError(out, e); }
   finally { btn.disabled = false; }
 });
 
 function renderJobs(out: HTMLElement, r: JobRes, ms: number | null) {
-  const B = ['Automate', 'Augment', 'Own'];
-  const split = B.map(
-    (b) =>
-      `<span class="b-${b}" style="width:${(r.split[b] * 100).toFixed(1)}%" title="${b} ${pct(r.split[b])}">${
-        r.split[b] >= 0.28 ? `${b} ${pct(r.split[b])}` : r.split[b] >= 0.08 ? pct(r.split[b]) : ''
-      }</span>`,
-  ).join('');
-  const col = (b: string) => {
-    const ts = r.tasks.filter((t) => t.bucket === b).sort((x, y) => y.p - x.p);
-    return `<div class="panel-d col b-${b}"><h4>${b} · ${ts.length}</h4>${
-      ts
-        .map(
-          (t) =>
-            `<div class="task">${esc(t.t)}${t.borderline ? '<span class="tag-b">borderline</span>' : ''}<div class="conf"><i style="width:${(t.p * 100).toFixed(0)}%"></i></div></div>`,
-        )
-        .join('') || '<p class="muted">None</p>'
-    }</div>`;
+  const categories=['Automate','Augment','Own'];
+  const colors=['#a49aff','#70dded','#81e2b1'];
+  const descriptions=['AI can do the task, with review','Work together with AI','Human judgment leads'];
+  const counts=categories.map(b=>r.tasks.filter(t=>t.bucket===b).length);
+  let offset=0;
+  const arcs=counts.map((n,i)=>{
+    const size=n/r.tasks.length*100;
+    const arc=`<circle cx="120" cy="120" r="94" fill="none" stroke="${colors[i]}" stroke-width="19" pathLength="100" stroke-dasharray="${size} ${100-size}" stroke-dashoffset="${-offset}" transform="rotate(-90 120 120)"/>`;
+    offset+=size;return arc;
+  }).join('');
+  out.innerHTML=`<div class="jr-summary"><svg class="jr-ring" viewBox="0 0 240 240" role="img" aria-label="${esc(categories.map((b,i)=>`${counts[i]} ${b}`).join(', '))}">${arcs}<text x="120" y="120" text-anchor="middle" class="jr-ring-number">${r.tasks.length}</text><text x="120" y="144" text-anchor="middle" class="jr-ring-label">YOUR TASKS</text></svg><div><span class="jr-result-kicker">Your work, mapped</span><h3>${esc(r.title)}</h3><p>See where AI can help—and where your judgment matters most. Select a category to explore your tasks.</p><div class="jr-run-meta"><span>Live analysis</span><span>${secs(ms || r.ms)}</span></div></div></div>
+  <div class="jr-stats">${categories.map((b,i)=>`<button class="jr-stat" data-job-filter="${b}" aria-pressed="false" style="--jr-color:${colors[i]}"><span class="jr-stat-label"><i></i>${b}</span><strong>${counts[i]}</strong><small>${descriptions[i]}</small></button>`).join('')}</div>
+  <div class="jr-task-heading"><h3>Your responsibilities</h3><button class="jr-all" data-job-filter="all" aria-pressed="true">All tasks</button></div><ol class="jr-task-list"></ol>
+  <p class="jr-footnote">Shares represent task counts, not time saved. AI assessments are estimates about responsibilities, not predictions that a job will disappear.</p><div class="jr-result-actions"><button class="btn-d" id="editJobTasks">Edit my tasks</button><button class="btn-d" id="copyJobResults">Copy results</button></div>`;
+  const show=(filter:string)=> {
+    $('.jr-task-list',out).innerHTML=r.tasks.map((t,i)=>({t,i})).filter(({t})=>filter==='all'||t.bucket===filter).map(({t,i})=>`<li class="jr-task-item"><span class="jr-task-index">${String(i+1).padStart(2,'0')}</span><div class="jr-task-copy"><p>${esc(t.t)}</p><small>${t.borderline ? 'Worth reviewing · ' : ''}${pct(t.p)} model confidence</small></div><span class="jr-category" style="--jr-color:${colors[categories.indexOf(t.bucket)]}">${esc(t.bucket)}</span></li>`).join('') || '<li class="jr-empty">No tasks in this category.</li>';
+    $$('[data-job-filter]',out).forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.jobFilter===filter)));
   };
-  const auto = r.tasks.filter((t) => t.bucket === 'Automate').sort((a, b) => b.p - a.p);
-  out.innerHTML = `
-    <div class="panel-d">
-      <h3 style="margin:0;font-size:22px">${esc(r.title)}</h3>
-      <p class="speed" style="margin:6px 0 12px"><b>${r.tasks.length} tasks sorted</b> ${ms == null ? '' : `· live in ${secs(ms)}`}</p>
-      <div class="split">${split}</div>
-      <p style="margin:12px 0 0;font-size:15px">${
-        r.percentile != null ? `More exposed to AI than <b>${pct(r.percentile)}</b> of jobs.` : `Average exposure ${r.exposure.toFixed(1)} of 5.`
-      }</p>
-    </div>
-    <p class="credit" style="margin:-4px 0 0">${B.map((b) => `<span class="b-${b}" style="color:var(--c)">■</span> ${b} ${pct(r.split[b])}`).join(' &nbsp; ')}</p>
-    <div class="cols">${B.map(col).join('')}</div>
-    <p class="credit">Based on the responsibilities you entered. AI estimates describe tasks, not whether your job will disappear.</p>
-    ${deeper(
-      `I'm a ${r.title}. An AI sorted my job's tasks and says these could be automated end to end with a human check:\n\n${auto
-        .slice(0, 6)
-        .map((t) => `- ${t.t}`)
-        .join('\n')}\n\nDraft a practical plan to automate the top one this month: tools, steps, the check a human keeps, and the risks to watch.`,
-    )}`;
+  $$('[data-job-filter]',out).forEach(b=>b.addEventListener('click',()=>show(b.dataset.jobFilter!)));
+  $('#editJobTasks',out).addEventListener('click',()=>{setJobStep('review');out.innerHTML='';});
+  $('#copyJobResults',out).addEventListener('click',()=>void copy(`${r.title}\n\n${r.tasks.map(t=>`${t.bucket}: ${t.t}`).join('\n')}`));
+  show('all');
 }
 
 // — Make your own check ————————————————————————————————————————
@@ -567,7 +598,7 @@ async function runCustom() {
                   .join('');
           return `<div class="panel-d"><h4>${esc(q.q)}</h4>${body}</div>`;
         })
-        .join('') + `<p class="speed"><b>${r.checks} checks</b> in ${secs(ms)}</p>`;
+        .join('') + `<p class="speed"><b>${r.checks} checks</b> in ${secs(ms)}</p>` + receipt(r);
     reveal(out);
   } catch (e) {
     t.stop();
@@ -644,19 +675,27 @@ $$('[data-copy]').forEach((pre) => {
 
 // — Room pulse (header stat + "recent apps") ——————————————————
 interface Room {
-  totals: { decisions: number; people: number };
+  totals: { decisions: number; people: number; spent:number };
   xray: { recent: string[] };
 }
 let room: Room | null = null;
 async function pollRoom() {
   try {
     room = await getJson<Room>('/api/wall');
-    if (room.totals.decisions)
-      $('#roomStat').textContent = `${fmt(room.totals.decisions)} decisions · ${room.totals.people} ${room.totals.people === 1 ? 'person' : 'people'} in the room`;
+    $('#roomStat').textContent = `${fmt(room.totals.decisions)} decisions · ${fmt(room.totals.people)} people · $${room.totals.spent.toFixed(4)} USD spent`;
   } catch {
     /* offline or not deployed: stay quiet */
   }
 }
+async function pollPersonal() {
+  try {
+    const res=await fetch('/api/usage',{headers:{'x-device-id':deviceId()}});
+    if (!res.ok) return;
+    const u=await res.json();
+    $('#personalStat').textContent=`${fmt(u.decisions)} decisions · ${fmt(u.runs)} tool calls · $${u.costUsd.toFixed(6)} USD${u.costComplete ? '' : ' (reported portion)'} · ${secs(u.elapsedMs)} processing`;
+  } catch {}
+}
+void pollPersonal();
 void pollRoom();
 setInterval(() => document.visibilityState === 'visible' && void pollRoom(), 10_000);
 

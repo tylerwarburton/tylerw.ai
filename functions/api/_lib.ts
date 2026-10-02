@@ -5,7 +5,10 @@
 // as a free general-purpose API; the only open-ended surface is the
 // token-gated /api/v1 passthrough, which is capped per token.
 
+export interface RunMeter { costUsd: number; calls: number; pricedCalls: number; inputTokens: number; outputTokens: number }
+
 export interface Env {
+  RUN_METER?: RunMeter;
   OPENROUTER_API_KEY: string;
   OPENROUTER_SECRET?: { get(): Promise<string> };
   DEMO_ADMIN_SECRET?: { get(): Promise<string> };
@@ -239,6 +242,15 @@ export function models(env: Env) {
 }
 
 export async function recordSpend(env: Env, usage: Usage | undefined) {
+  if (env.RUN_METER) {
+    const m = env.RUN_METER;
+    m.inputTokens += usage?.prompt_tokens || 0;
+    m.outputTokens += usage?.completion_tokens || 0;
+    if (typeof usage?.cost === 'number' && Number.isFinite(usage.cost) && usage.cost >= 0) {
+      m.costUsd += usage.cost;
+      m.pricedCalls++;
+    }
+  }
   if (!usage?.cost) return;
   const s = await store(env);
   await s.incr('spend', usage.cost);
@@ -267,6 +279,7 @@ export async function completeJson<T>(
   let lastErr = '';
   for (let attempt = 0; attempt < plan.length; attempt++) {
     const model = plan[attempt];
+    if (env.RUN_METER) env.RUN_METER.calls++;
     const res = await fetch(OPENROUTER, {
       method: 'POST',
       signal: AbortSignal.timeout(15000),
