@@ -270,24 +270,24 @@ interface Card {
   checks: number;
   ms: number;
   cached: boolean;
-  rows: { key: string; good: boolean; p: number; clause: number; evidence: string }[];
+  rows: { key: string; good: boolean; p: number; clause: number; evidence: string; assessment?:string; summary?:string }[];
   risks: number;
   riskTotal: number;
 }
 
 const XQ: Record<string, string> = {
-  sells: 'Sells or "shares" your data for ads',
-  third_party: 'Shares data with third parties',
-  location: 'Collects precise location',
-  contacts: 'Collects your contacts',
-  biometrics: 'Collects face, voice or biometrics',
-  health: 'Collects health or fitness data',
-  ai_training: 'Uses your content to train AI',
-  retention: 'Keeps data after you delete your account',
-  tracking: 'Tracks you across other apps and sites',
-  government: 'Discloses to government on request',
-  delete: 'Lets you delete your data',
-  opt_out: 'Lets you opt out of sale or targeted ads',
+  sells: 'Sale or advertising-related sharing',
+  third_party: 'Third-party sharing',
+  location: 'Precise location',
+  contacts: 'Contacts and address book',
+  biometrics: 'Biometric information',
+  health: 'Health and fitness information',
+  ai_training: 'AI training',
+  retention: 'Retention after account deletion',
+  tracking: 'Cross-site and cross-app tracking',
+  government: 'Government and legal disclosures',
+  delete: 'Data deletion controls',
+  opt_out: 'Sale or advertising opt-out controls',
 };
 
 interface StoreMatch { id: string; name: string; seller: string; genre: string; icon?: string }
@@ -306,15 +306,18 @@ function renderPicker(q: string) {
   const version = ++searchVersion;
   const picker = $('#appPicker');
   picker.hidden = false;
-  if (q.trim().length < 2) {
+  if (q.trim().length < 1) {
     picker.innerHTML = '<p class="muted">Search the App Store by name. Every policy analysis runs live when you select an app.</p>';
     return;
   }
-  picker.innerHTML = '<div id="storeMatches" class="app-row" aria-live="polite"><p class="muted">Searching the App Store…</p></div>';
-  searchTimer = window.setTimeout(() => void searchStore(q.trim(), version), 300);
+  picker.innerHTML = '<div id="storeMatches" class="app-row" aria-live="polite"><p class="muted">Waiting for you to finish typing…</p></div>';
+  searchTimer = window.setTimeout(() => void searchStore(q.trim(), version), 2000);
 }
 
 async function searchStore(query: string, version: number) {
+  if(version !== searchVersion) return;
+  const target=$('#storeMatches');
+  if(target) target.innerHTML='<p class="muted">Searching the App Store…</p>';
   const controller = new AbortController();
   searchController = controller;
   try {
@@ -381,16 +384,15 @@ async function runXray(id: string, name?: string, icon?:string) {
 }
 
 function renderXray(out: HTMLElement, r: Card, ms: number | null, icon?:string) {
-  const risky = r.rows.filter((x) => !x.good && x.p >= 0.6).sort((a, b) => b.p - a.p);
-  const group = (x:Card['rows'][number]) => x.good ? (x.p >= .6 ? 'green' : 'yellow') : x.p >= .6 ? 'red' : x.p >= .4 ? 'yellow' : 'green';
+  const group = (x:Card['rows'][number]) => x.good ? (['stated','conditional'].includes(x.assessment || '') ? 'green' : 'yellow') : x.assessment==='denied' ? 'green' : x.assessment==='stated' ? 'red' : 'yellow';
   const columns = [
-    {key:'red',title:'Red · Risks',description:'Strong risk signals',color:'var(--d-bad)'},
-    {key:'yellow',title:'Yellow · Review',description:'Uncertain or protection not confirmed',color:'var(--d-unsure)'},
-    {key:'green',title:'Green · Lower concern',description:'Low risk signals or stated protections',color:'var(--d-good)'},
+    {key:'red',title:'Red · Data use',description:'Data practices stated in the policy',color:'var(--d-bad)'},
+    {key:'yellow',title:'Yellow · Review',description:'Conditional, unclear, or not found',color:'var(--d-unsure)'},
+    {key:'green',title:'Green · Protections',description:'Stated controls or explicit limits',color:'var(--d-good)'},
   ].map(column => {
     const rows=r.rows.map((x,i)=>({x,i})).filter(({x})=>group(x)===column.key);
     return `<section class="scan-column" style="--c:${column.color}"><h4>${column.title}<span>${rows.length}</span></h4><p>${column.description}</p>${rows.map(({x,i})=>`<div class="qrow">
-      <button aria-expanded="false" data-row="${i}"><span class="q">${esc(XQ[x.key])}</span><span class="scan-row-status">${x.good ? x.p>=.6 ? 'Protection indicated' : 'Not confirmed' : x.p>=.6 ? 'Risk indicated' : x.p>=.4 ? 'Uncertain' : 'Not indicated'} · ${pct(x.p)} likelihood</span><span class="scan-evidence-hint">View evidence ↓</span></button>
+      <button aria-expanded="false" data-row="${i}"><span class="q">${esc(XQ[x.key])}</span><span class="scan-row-status">${esc(x.summary || 'Needs review in the source policy.')}</span><span class="scan-evidence-hint">View evidence ↓</span></button>
       <div class="evidence" hidden>${x.evidence ? `“${esc(x.evidence)}”` : 'No supporting passage returned.'}<br /><a href="${esc(r.url)}" target="_blank" rel="noopener">Read the policy</a></div>
     </div>`).join('') || '<p class="scan-empty">None in this group.</p>'}</section>`;
   }).join('');
@@ -399,10 +401,6 @@ function renderXray(out: HTMLElement, r: Card, ms: number | null, icon?:string) 
       <div class="x-head">${appIcon(icon,r.name)}
         <div><h3>${esc(r.name)}</h3><p>Policy ${esc(r.updated || 'date not stated')} · <a href="${esc(r.url)}" target="_blank" rel="noopener">source</a></p></div></div>
       <p class="speed" style="margin:12px 0 0"><b>${fmt(r.clauses)} clauses × 12 questions = ${fmt(r.checks)} checks</b> ${ms == null ? '' : `· live in ${secs(ms)}`}</p>
-    </div>
-    <div class="verdict" style="--c:${r.risks >= 7 ? 'var(--d-bad)' : r.risks >= 4 ? 'var(--d-unsure)' : 'var(--d-good)'}">
-      <div class="word">${r.risks} of ${r.riskTotal} risk signals found</div>
-      <p class="muted" style="margin:8px 0 0">${risky.length ? `Worst: ${risky.slice(0, 3).map((x) => esc(XQ[x.key])).join(' · ')}` : 'No strong risk signals.'}</p>
     </div>
     <div class="scan-columns">${columns}</div>
     `;
@@ -445,6 +443,7 @@ $('#jobProfile').addEventListener('input',countJobInputs);
 $('#jobTasks').addEventListener('input',countJobInputs);
 $('#jobBackContext').addEventListener('click',()=>setJobStep('context'));
 $('#manualJob').addEventListener('click', () => {
+  $('#jobTaskSource').hidden=true;
   setJobStep('review');
   reveal($('#jobReview'));
 });
@@ -456,7 +455,9 @@ $('#extractJob').addEventListener('click', async () => {
   btn.disabled = true;
   const t = ticker(out, 0, 'Reading your work experience', 0);
   try {
-    const r = await api<{ title: string; tasks: string[] }>('/api/tools/jobs', { action: 'extract', profile }, t.retry);
+    const r = await api<{ title: string; tasks: string[]; source?:string }>('/api/tools/jobs', { action: 'extract', profile }, t.retry);
+    $('#jobTaskSource').hidden=r.source!=='suggested';
+    $('#jobTaskSource').textContent='Your profile lists a role but no duties. These are suggested tasks for that role—edit or remove anything that does not fit.';
     $<HTMLInputElement>('#jobSearch').value = r.title;
     $<HTMLTextAreaElement>('#jobTasks').value = r.tasks.join('\n');
     setJobStep('review');

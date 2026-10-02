@@ -4,7 +4,7 @@ import { searchApps } from '../_policy';
 
 export const onRequestGet = handler(async ({ env, request }) => {
   const q = (new URL(request.url).searchParams.get('q') ?? '').trim().slice(0, 60);
-  if (q.length < 2) return fail(400, 'Type at least two letters.');
+  if (q.length < 1) return fail(400, 'Type an app name.');
   await rateLimit(env, `${deviceId(request)}:search`, 60);
   const s = await store(env);
   const key = `app-search-v2:${q.toLowerCase()}`;
