@@ -405,14 +405,7 @@ function renderXray(out: HTMLElement, r: Card, ms: number | null, icon?:string) 
       <p class="muted" style="margin:8px 0 0">${risky.length ? `Worst: ${risky.slice(0, 3).map((x) => esc(XQ[x.key])).join(' · ')}` : 'No strong risk signals.'}</p>
     </div>
     <div class="scan-columns">${columns}</div>
-    <p class="credit">Based on the policy text. Green does not guarantee that an app is safe.</p>
-    <button class="btn-d" id="pickAnother">Check another app</button>
-    ${deeper(
-      `Here are clauses from the ${r.name} privacy policy that an AI flagged. Explain the practical privacy risk of each in plain English, and tell me exactly which settings to change in the ${r.name} app to reduce it:\n\n${risky
-        .slice(0, 5)
-        .map((x) => `- ${XQ[x.key]}: "${x.evidence}"`)
-        .join('\n')}`,
-    )}`;
+    `;
   $$('[data-row]', out).forEach((b) =>
     b.addEventListener('click', () => {
       const ev = b.nextElementSibling as HTMLElement;
@@ -420,11 +413,7 @@ function renderXray(out: HTMLElement, r: Card, ms: number | null, icon?:string) 
       b.setAttribute('aria-expanded', String(!ev.hidden));
     }),
   );
-  $('#pickAnother', out).addEventListener('click', () => {
-    out.innerHTML = '';
-    $('#appPicker').hidden = false;
-    void renderPicker($<HTMLInputElement>('#appSearch').value);
-  });
+
 }
 
 // — Job Radar ——————————————————————————————————————————————
