@@ -268,13 +268,14 @@ export function reasoningFor(model: string) {
  */
 export async function completeJson<T>(
   env: Env,
-  opts: { system: string; user: string; schema: object; maxTokens?: number; validate?: (data: T) => boolean; model?: string },
+  opts: { system: string; user: string; schema: object; maxTokens?: number; validate?: (data: T) => boolean; model?: string; timeoutMs?:number; maxAttempts?:number },
 ): Promise<{ data: T; usage?: Usage; model: string; ms: number }> {
   if (!env.OPENROUTER_API_KEY) throw new HttpError(501, 'The demo is not switched on yet. Check back in a minute.');
   const { primary, fallbacks } = models(env);
   const first = opts.model || primary;
   // First choice gets two tries; each fallback one. Busy responses back off first.
-  const plan = [first, first, ...fallbacks.filter((m) => m !== first)];
+  const alternatives=fallbacks.filter((m) => m !== first);
+  const plan = (opts.maxAttempts ? [first,...alternatives,first] : [first,first,...alternatives]).slice(0,opts.maxAttempts);
   const started = Date.now();
   let lastErr = '';
   for (let attempt = 0; attempt < plan.length; attempt++) {
@@ -282,7 +283,7 @@ export async function completeJson<T>(
     if (env.RUN_METER) env.RUN_METER.calls++;
     const res = await fetch(OPENROUTER, {
       method: 'POST',
-      signal: AbortSignal.timeout(15000),
+      signal: AbortSignal.timeout(opts.timeoutMs ?? 15000),
       headers: {
         authorization: `Bearer ${env.OPENROUTER_API_KEY}`,
         'content-type': 'application/json',
@@ -338,7 +339,8 @@ export async function completeJson<T>(
     if (res.status === 429 || res.status >= 500) await sleep(250 * 2 ** Math.min(attempt, 3) + Math.random() * 300);
   }
   console.error('openrouter failed:', lastErr);
-  throw new HttpError(503, 'The room is busy. Trying again in a moment usually works.', { retryAfter: 2 });
+  const message=lastErr.includes('timed out') ? 'The AI service did not respond in time.' : /validation|JSON|could not be read/.test(lastErr) ? 'The AI service returned an incomplete result.' : 'The AI service could not complete this request.';
+  throw new HttpError(503, message + ' Please retry.', { retryable:false });
 }
 
 function extractJson(text: string) {

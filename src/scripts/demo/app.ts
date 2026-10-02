@@ -40,10 +40,12 @@ class ApiError extends Error {
 }
 
 interface RunUsage { costUsd:number; costComplete:boolean; elapsedMs:number; calls:number; inputTokens:number; outputTokens:number }
-function receipt(r: {runUsage?:RunUsage}) {
+function updateReceipt(r: {runUsage?:RunUsage}) {
   const u = r.runUsage;
-  if (!u) return '';
-  return `<div class="run-receipt"><span>${u.costComplete ? '' : 'Reported portion: '}$${u.costUsd.toFixed(6)} USD${u.costComplete ? '' : ' · cost incomplete'}</span><span>${secs(u.elapsedMs)} total time</span><span>${fmt(u.inputTokens + u.outputTokens)} tokens</span></div>`;
+  if (!u) return;
+  const header=$('#runReceipt');
+  header.hidden=false;
+  header.innerHTML = `<div class="run-receipt"><span>${u.costComplete ? '' : 'Reported portion: '}$${u.costUsd.toFixed(6)} USD${u.costComplete ? '' : ' · cost incomplete'}</span><span>${secs(u.elapsedMs)} total time</span><span>${fmt(u.inputTokens + u.outputTokens)} tokens</span></div>`;
 }
 async function api<T>(path: string, payload: unknown, onRetry?: (msg: string) => void): Promise<T & {runUsage:RunUsage}> {
   const started = performance.now();
@@ -59,11 +61,12 @@ async function api<T>(path: string, payload: unknown, onRetry?: (msg: string) =>
     } else if (!res) usage.costComplete = false;
     usage.elapsedMs = performance.now() - started;
     void pollPersonal();
+    updateReceipt({runUsage:usage});
     if (res?.ok) return {...data,runUsage:usage};
     const status = res?.status ?? 0;
     // A lost response might already have incurred cost: do not repeat it automatically.
-    if ((status === 429 || status === 503) && attempt < 2) {
-      onRetry?.('The room is busy. Trying again…');
+    if (path !== '/api/tools/xray' && data.retryable !== false && (status === 429 || status === 503) && attempt < 2) {
+      onRetry?.(`${data.error || 'The request could not finish.'} Retrying…`);
       await new Promise(r => setTimeout(r,(attempt+2)*1000)); continue;
     }
     throw new ApiError(status,data.error || 'Connection interrupted. Please try again.',usage);
@@ -137,7 +140,7 @@ function reveal(el: HTMLElement) {
 }
 
 function showError(el: HTMLElement, err: unknown) {
-  el.innerHTML = `<div class="err">${esc(err instanceof Error ? err.message : 'Something went wrong.')}</div>${err instanceof ApiError ? receipt(err) : ''}`;
+  el.innerHTML = `<div class="err">${esc(err instanceof Error ? err.message : 'Something went wrong.')}</div>`;
 }
 
 const hue = (s: string) => [...s].reduce((a, c) => (a * 31 + c.charCodeAt(0)) % 360, 7);
@@ -188,8 +191,9 @@ function renderEmail() {
     const breakdown=stage==='priority' && r.priority ? `<div class="panel-d">${Object.entries(r.priority).map(([k,p])=>pbar(cap(k),p)).join('')}</div>` : '';
     return `<details class="email-stage email-collapsible" data-stage="${stage}" style="--c:${color}"${expanded.has(stage) ? ' open' : ''}>
       <summary><span class="email-summary-label">${i+1}. ${cap(stage)}</span><strong class="email-summary-verdict">${esc(cap(label))}</strong><span class="email-summary-score">${pct(score)}<small>${metric}</small></span><span class="gauge"><i style="left:${score*100}%"></i></span><span class="email-expand-hint"><span class="when-closed">Click to see more ↓</span><span class="when-open">Hide details ↑</span></span></summary>
-      <div class="email-expanded">${visual}${breakdown}${receipt(r)}</div></details>`;
-  }).join('') + (usages.length ? '<h4>This sequence</h4>'+receipt({runUsage:total}) : '') + (emailError ? `<div class="err">${esc(emailError)}</div>` : '') + '<p class="credit">Text-only AI assessment. It cannot authenticate a sender or verify links. Confirm sensitive requests through a trusted channel.</p>';
+      <div class="email-expanded">${visual}${breakdown}</div></details>`;
+  }).join('') + '' + (emailError ? `<div class="err">${esc(emailError)}</div>` : '') + '<p class="credit">Text-only AI assessment. It cannot authenticate a sender or verify links. Confirm sensitive requests through a trusted channel.</p>';
+  if (usages.length) updateReceipt({runUsage:total});
   const scam = emailResults[0];
   if (scam?.kind && scam.pressure && scam.flags) renderScam($('#emailScamVisual'),scam as ScamResult,scam.runUsage?.elapsedMs || scam.ms || 0,emailText);
   $<HTMLButtonElement>('#scamGo').disabled = emailBusy || emailResults.some(r => r.stopped) || emailResults.length === 3;
@@ -368,7 +372,6 @@ async function runXray(id: string, name?: string, icon?:string) {
     });
     if (version !== xrayVersion) return;
     renderXray(out, r, performance.now() - started, icon);
-    out.insertAdjacentHTML('beforeend',receipt(r));
   } catch (e) {
     if (version !== xrayVersion) return;
     showError(out, e);
@@ -463,7 +466,6 @@ $('#extractJob').addEventListener('click', async () => {
     setJobStep('review');
     $('#jobsOut').innerHTML = '';
     out.innerHTML = '';
-    $('#jobReview').insertAdjacentHTML('beforeend',receipt(r));
     countJobInputs();
     reveal($('#jobReview'));
   } catch (e) { showError(out, e); }
@@ -481,7 +483,6 @@ $('#jobsGo').addEventListener('click', async () => {
   try {
     const r = await api<JobRes>('/api/tools/jobs', { title, tasks }, t.retry);
     renderJobs(out, r, performance.now() - started);
-    out.insertAdjacentHTML('beforeend',receipt(r));
     setJobStep('results');
     reveal(out);
   } catch (e) { showError(out, e); }
@@ -587,7 +588,7 @@ async function runCustom() {
                   .join('');
           return `<div class="panel-d"><h4>${esc(q.q)}</h4>${body}</div>`;
         })
-        .join('') + `<p class="speed"><b>${r.checks} checks</b> in ${secs(ms)}</p>` + receipt(r);
+        .join('') + `<p class="speed"><b>${r.checks} checks</b> in ${secs(ms)}</p>`;
     reveal(out);
   } catch (e) {
     t.stop();

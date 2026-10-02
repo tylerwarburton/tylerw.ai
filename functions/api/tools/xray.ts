@@ -109,13 +109,21 @@ export async function score(env: Parameters<typeof completeJson>[0], policy: Pol
     ].join(' '),
     user:JSON.stringify({questions:Object.fromEntries(keys.map(key=>[key,XRAY_QUESTIONS[key]])),prior,clauses:policy.clauses.map((text,clause)=>({clause,text}))}),
     schema:{type:'object',additionalProperties:false,properties:{rows:{type:'array',minItems:keys.length,maxItems:keys.length,items:{type:'object',additionalProperties:false,properties:{key:{type:'string',enum:keys},assessment:{type:'string',enum:['stated','conditional','denied','not_found','unclear']},summary:{type:'string'},clause:{type:'integer'},needsVerification:{type:'boolean'}},required:['key','assessment','summary','clause','needsVerification']}}},required:['rows']},
-    maxTokens:2200,model,
+    maxTokens:2200,model,timeoutMs:10000,maxAttempts:3,
     validate:d=>!!d && Array.isArray(d.rows) && d.rows.length===keys.length && new Set(d.rows.map(r=>r.key)).size===keys.length && d.rows.every(r=>keys.includes(r.key) && ['stated','conditional','denied','not_found','unclear'].includes(r.assessment) && typeof r.needsVerification==='boolean' && typeof r.summary==='string' && Number.isInteger(r.clause) && r.clause>=-1 && r.clause<policy.clauses.length && (r.clause>=0 || ['not_found','unclear'].includes(r.assessment))),
   });
   const initial=await review(keys);
   const conditionalSummary=(row:ContextRow)=>row.assessment==='stated' && /\b(only (if|when)|when you|if you|you (can|may) (choose|upload|enable|opt)|consent|optional|opt[ -]in|enabl(?:e|ed|ing)|choose to)\b/i.test(row.summary);
   const unresolved=initial.data.rows.filter(row=>row.assessment==='unclear' || row.needsVerification || conditionalSummary(row));
-  const verified=unresolved.length ? (await review(unresolved.map(row=>row.key),unresolved)).data.rows : [];
+  let verified:ContextRow[]=[];
+  if (unresolved.length) {
+    try { verified=(await review(unresolved.map(row=>row.key),unresolved)).data.rows; }
+    catch (error) {
+      if (!(error instanceof HttpError) || error.status!==503) throw error;
+      // Preserve completed findings; never present unresolved claims as verified.
+      verified=unresolved.map(row=>({...row,assessment:'unclear',needsVerification:true}));
+    }
+  }
   const contextualRows=keys.map(key=>{
     const found=verified.find(row=>row.key===key) || initial.data.rows.find(row=>row.key===key)!;
     return {key,good:GOOD.has(key),assessment:(found.needsVerification || conditionalSummary(found))?'unclear':found.assessment,

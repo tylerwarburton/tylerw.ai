@@ -100,6 +100,7 @@ const titles: Record<string, string> = { scam: 'Scam Check', xray: 'App Privacy 
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7" /></svg> All tools
         </a>
         <h1 id="sheetTitle">{titles[tool]}</h1>
+        <div id="runReceipt" aria-live="polite" aria-label="Latest run usage" hidden></div>
       </div>
       <div class="sheet-body">
         <!-- Scam Check -->
@@ -1248,6 +1249,10 @@ const titles: Record<string, string> = { scam: 'Scam Check', xray: 'App Privacy 
   .usage-label { font-size:12px; text-transform:uppercase; letter-spacing:.09em; color:var(--d-muted); }
   .usage-grid .d-stat { margin:8px 0; line-height:1.7; color:var(--d-text); }
   .usage-grid small { color:var(--d-muted); font-size:11px; }
+  #runReceipt { margin-left:auto; min-width:0; }
+  .sheet-bar { flex-wrap:wrap; }
+  #runReceipt :global(.run-receipt) { margin:0; padding:0; border:0; gap:4px 12px; justify-content:flex-end; }
+  @media (max-width:600px) { #runReceipt { flex-basis:100%; margin-left:0; } #runReceipt :global(.run-receipt) { justify-content:flex-start; } }
   :global(.run-receipt) { display:flex; flex-wrap:wrap; gap:8px 18px; padding:12px 16px; border:1px solid var(--d-border); border-radius:12px; font-size:12px; color:var(--d-muted); margin-top:12px; }
   :global(.email-stage) { border:1px solid var(--d-border); border-radius:16px; padding:20px; margin:12px 0; }
   :global(.email-stage h3) { margin:0 0 8px; }

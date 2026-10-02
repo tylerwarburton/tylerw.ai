@@ -124,3 +124,25 @@ test('a conditional summary with an unconditional label receives focused verific
   assert.equal(calls,2);assert.equal(r.rows.find(x=>x.key==='location').assessment,'conditional');
  }finally{globalThis.fetch=originalFetch;}
 });
+
+test('failed follow-up preserves completed findings and marks unresolved topics unclear',async()=>{
+ let calls=0;
+ globalThis.fetch=async(url,init)=>{
+  calls++;
+  if(calls>1)throw Error('provider unavailable');
+  const data={rows:Object.keys(XRAY_QUESTIONS).map(key=>({key,assessment:key==='location'?'unclear':key==='sells'?'denied':'not_found',summary:key==='sells'?'No sale of personal data.':'Unresolved.',clause:key==='sells'?0:-1,needsVerification:key==='location'}))};
+  return Response.json({choices:[{message:{content:JSON.stringify(data)}}],usage:{cost:.001}});
+ };
+ try{
+  const r=await score(env,{id:'test',name:'Example',category:'Tools',url:'https://example.com/privacy',updated:'',clauses:['We do not sell personal data.']});
+  assert.equal(calls,4);assert.equal(r.rows.find(x=>x.key==='sells').assessment,'denied');assert.equal(r.rows.find(x=>x.key==='location').assessment,'unclear');
+ }finally{globalThis.fetch=originalFetch;}
+});
+test('initial service failure is bounded and does not blame room traffic',async()=>{
+ const requested=[];
+ globalThis.fetch=async(url,init)=>{requested.push(JSON.parse(init.body).model);throw Error('offline');};
+ try{
+  await assert.rejects(score({...env,DEMO_FALLBACK_MODELS:'test-backup-a,test-backup-b'},{id:'test',name:'Example',category:'Tools',url:'https://example.com/privacy',updated:'',clauses:['Privacy policy.']}),e=>e.status===503 && e.extra.retryable===false && !/room|busy/i.test(e.message));
+  assert.equal(requested.length,3);assert.equal(new Set(requested).size,3);
+ }finally{globalThis.fetch=originalFetch;}
+});
