@@ -89,81 +89,16 @@ async function copy(text: string, what = 'Copied') {
   toast(what);
 }
 
-// — Sheet ————————————————————————————————————————————————————
-const TITLES: Record<string, string> = {
-  scam: 'Scam Check',
-  xray: 'App Privacy X-ray',
-  jobs: 'Job Radar',
-  custom: 'Make your own check',
-};
+// Each tool has a dedicated page. Old hash links redirect to those pages.
+const TITLES: Record<string, string> = { scam: 'Scam Check', xray: 'App Privacy X-ray', jobs: 'Job Radar', custom: 'Make your own check' };
 const openers: Record<string, () => void> = {};
-
-function openSheet(tool: string, push = true) {
-  const sheet = $('#sheet');
-  $$('.tool', sheet).forEach((t) => (t.hidden = t.dataset.tool !== tool));
-  $('#sheetTitle').textContent = TITLES[tool];
-  $('#scrim').hidden = false;
-  sheet.hidden = false;
-  requestAnimationFrame(() => sheet.classList.add('open'));
-  document.body.style.overflow = 'hidden';
-  if (push) history.pushState({ tool }, '', `#${tool}`);
-  openers[tool]?.();
-  setTimeout(() => $<HTMLElement>('textarea, input', $(`.tool[data-tool="${tool}"]`))?.focus({ preventScroll: true }), 300);
-}
-
-function closeSheet(pop = true) {
-  const sheet = $('#sheet');
-  sheet.classList.remove('open');
-  $('#scrim').hidden = true;
-  document.body.style.overflow = '';
-  setTimeout(() => (sheet.hidden = true), 280);
-  if (pop && location.hash) history.back();
-}
-
-$$('[data-open]').forEach((b) => b.addEventListener('click', () => openSheet(b.dataset.open!)));
-$('#sheetBack').addEventListener('click', () => closeSheet());
-$('#scrim').addEventListener('click', () => closeSheet());
-document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && !$('#sheet').hidden) closeSheet();
-});
-window.addEventListener('popstate', () => {
-  const tool = location.hash.slice(1);
-  if (TITLES[tool]) openSheet(tool, false);
-  else if (!$('#sheet').hidden) closeSheet(false);
-});
-
+const pageTool = $('#demo').dataset.tool || '';
+if (!pageTool && TITLES[location.hash.slice(1)]) location.replace(`/demo/${location.hash.slice(1)}/`);
 
 // — Shared result pieces ——————————————————————————————————————
-function ticker(el: HTMLElement, total: number, label: string, expectMs: number) {
-  const start = performance.now();
-  let raf = 0;
-  const frame = () => {
-    const t = Math.min((performance.now() - start) / expectMs, 0.97);
-    el.innerHTML = `<div class="ticker">checks: ${fmt(total * (1 - Math.pow(1 - t, 2)))}…<small>${esc(label)}</small></div>`;
-    raf = requestAnimationFrame(frame);
-  };
-  frame();
-  return {
-    retry(msg: string) {
-      cancelAnimationFrame(raf);
-      el.innerHTML = `<div class="err">${esc(msg)}</div>`;
-    },
-    stop: () => cancelAnimationFrame(raf),
-  };
-}
-
-/** Plays a counter up to the real total (used for cached runs too). */
-function countUp(el: HTMLElement, total: number, ms = 900) {
-  return new Promise<void>((done) => {
-    const start = performance.now();
-    const frame = () => {
-      const t = Math.min((performance.now() - start) / ms, 1);
-      el.innerHTML = `<div class="ticker">checks: ${fmt(total * (1 - Math.pow(1 - t, 3)))}</div>`;
-      if (t < 1) requestAnimationFrame(frame);
-      else done();
-    };
-    frame();
-  });
+function ticker(el: HTMLElement, _total: number, label: string, _expectMs: number) {
+  el.innerHTML = `<div class="panel-d" role="status"><p class="muted">${esc(label)} · Running live…</p></div>`;
+  return { retry(msg: string) { el.innerHTML = `<div class="panel-d" role="status">${esc(msg)}</div>`; }, stop() {} };
 }
 
 function pbar(label: string, p: number, color = 'var(--d-accent)') {
@@ -205,14 +140,6 @@ const initials = (name: string) =>
     .toUpperCase() || name.slice(0, 2);
 
 // — Scam Check ——————————————————————————————————————————————
-const EXAMPLES: Record<string, string> = {
-  toll: 'FINAL NOTICE: Your E-ZPass account has an unpaid toll balance of $4.35. Pay by today to avoid a $50 late fee and suspension: https://ezpass-va.info/pay',
-  package:
-    'USPS: Your package is on hold due to an incomplete address. Update your details within 24 hours or it will be returned: https://usps-redelivery.co/track',
-  wrong: "Hi Jenny, it's Mike from the conference last week. Are we still on for coffee Thursday? Sorry if wrong number!",
-  legit: 'Your Chase card ending in 4412 was used for $62.18 at Kroger. If this wasn\'t you, call the number on the back of your card.',
-};
-
 interface ScamResult {
   band: 'scam' | 'legit' | 'unsure';
   likelihood: number;
@@ -224,11 +151,6 @@ interface ScamResult {
   ms: number;
 }
 
-$$('[data-example]').forEach((b) =>
-  b.addEventListener('click', () => {
-    $<HTMLTextAreaElement>('#scamText').value = EXAMPLES[b.dataset.example!];
-  }),
-);
 $('#scamText').addEventListener('keydown', (e) => {
   if (e.key === 'Enter' && !e.shiftKey) {
     e.preventDefault();
@@ -300,15 +222,6 @@ function renderScam(out: HTMLElement, r: ScamResult, roundTrip: number, text: st
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
 // — App Privacy X-ray ————————————————————————————————————————
-interface AppMeta {
-  id: string;
-  name: string;
-  category: string;
-  url: string;
-  updated: string;
-  clauses: number;
-  error?: string;
-}
 interface Card {
   app: string;
   name: string;
@@ -338,48 +251,28 @@ const XQ: Record<string, string> = {
   opt_out: 'Lets you opt out of sale or targeted ads',
 };
 
-let apps: AppMeta[] = [];
-openers.xray = async () => {
-  if (apps.length) return;
-  try {
-    apps = (await getJson<AppMeta[]>('/demo-data/xray/apps.json')).filter((a) => a.clauses > 0);
-  } catch {
-    $('#appPicker').innerHTML = '<div class="err">App list is still loading. Try again in a moment.</div>';
-    return;
-  }
-  renderPicker($<HTMLInputElement>('#appSearch').value);
-};
-
-interface StoreMatch { id: string; name: string; seller: string; genre: string }
+interface StoreMatch { id: string; name: string; seller: string; genre: string; icon?: string }
 let searchTimer = 0;
 let searchController: AbortController | null = null;
 let searchVersion = 0;
 let xrayVersion = 0;
-
+openers.xray = () => renderPicker($<HTMLInputElement>('#appSearch').value);
+function appIcon(icon: string | undefined, name: string) {
+  return icon ? `<img class="app-icon" src="${esc(icon)}" alt="" width="56" height="56" loading="lazy" referrerpolicy="no-referrer">`
+    : `<span class="mono-g" style="--h:${hue(name)}">${esc(initials(name))}</span>`;
+}
 function renderPicker(q: string) {
   clearTimeout(searchTimer);
   searchController?.abort();
   const version = ++searchVersion;
   const picker = $('#appPicker');
-  const needle = q.trim().toLowerCase();
-  const list = needle ? apps.filter((a) => a.name.toLowerCase().includes(needle)) : apps;
-  const tile = (a: AppMeta) =>
-    `<button class="tile" data-app="${esc(a.id)}"><span class="mono-g" style="--h:${hue(a.name)}">${esc(initials(a.name))}</span>${esc(a.name)}</button>`;
-  let html = '';
-  if (!needle && room?.xray.recent.length) {
-    const recent = room.xray.recent.map((id) => apps.find((a) => a.id === id)).filter(Boolean) as AppMeta[];
-    if (recent.length) html += `<div class="app-row"><h5>Recently checked in this room</h5><div class="tiles">${recent.map(tile).join('')}</div></div>`;
-  }
-  const cats = [...new Set(list.map((a) => a.category))];
-  html += cats
-    .map((c) => `<div class="app-row"><h5>${esc(c)}</h5><div class="tiles">${list.filter((a) => a.category === c).map(tile).join('')}</div></div>`)
-    .join('');
-  picker.innerHTML = html || '<p class="muted">No ready-to-view match. Type at least two letters to search the App Store.</p>';
-  if (needle.length >= 2) {
-    picker.insertAdjacentHTML('beforeend', '<div id="storeMatches" class="app-row" aria-live="polite"><h5>App Store · live policy check</h5><p class="muted">Searching the App Store…</p></div>');
-    searchTimer = window.setTimeout(() => void searchStore(q.trim(), version), 300);
-  }
   picker.hidden = false;
+  if (q.trim().length < 2) {
+    picker.innerHTML = '<p class="muted">Search the App Store by name. Every policy analysis runs live when you select an app.</p>';
+    return;
+  }
+  picker.innerHTML = '<div id="storeMatches" class="app-row" aria-live="polite"><p class="muted">Searching the App Store…</p></div>';
+  searchTimer = window.setTimeout(() => void searchStore(q.trim(), version), 300);
 }
 
 async function searchStore(query: string, version: number) {
@@ -392,12 +285,11 @@ async function searchStore(query: string, version: number) {
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Search could not load. Try again.');
     if (version !== searchVersion) return;
-    const matches = (data.apps as StoreMatch[]).filter((a) =>
-      !apps.some((local) => local.name.toLowerCase() === a.name.toLowerCase()));
+    const matches = data.apps as StoreMatch[];
     $('#storeMatches').innerHTML = `<h5>App Store · live policy check</h5>${matches.length
-      ? `<p class="muted">New apps usually take 10–40 seconds. Some publishers block policy readers.</p><div class="tiles">${matches.map((a) =>
-        `<button class="tile" data-store="${esc(a.id)}" data-name="${esc(a.name)}" title="${esc(a.seller)}"><span class="mono-g" style="--h:${hue(a.name)}">${esc(initials(a.name))}</span>${esc(a.name)}<small class="muted">${esc(a.seller)}</small></button>`).join('')}</div>`
-      : '<p class="muted">No additional matches. Try another name or choose a ready-to-view app above.</p>'}`;
+      ? `<p class="muted">Live analysis usually takes 10–40 seconds. Some publishers block policy readers.</p><div class="tiles">${matches.map((a) =>
+        `<button class="tile" data-store="${esc(a.id)}" data-name="${esc(a.name)}" title="${esc(a.seller)}">${appIcon(a.icon, a.name)}${esc(a.name)}<small class="muted">${esc(a.seller)}</small></button>`).join('')}</div>`
+      : '<p class="muted">No matches. Try another app name.</p>'}`;
   } catch (err) {
     if (controller.signal.aborted || version !== searchVersion) return;
     const out = $('#storeMatches');
@@ -414,30 +306,26 @@ $('#appSearch').addEventListener('input', (e) => {
 $('#appPicker').addEventListener('click', (e) => {
   const target = e.target as Element;
   if (target.closest('[data-search-retry]')) return renderPicker($<HTMLInputElement>('#appSearch').value);
-  const b = target.closest<HTMLElement>('[data-app], [data-store]');
-  if (b) void runXray(b.dataset.app || b.dataset.store!, !!b.dataset.store, b.dataset.name);
+  const b = target.closest<HTMLElement>('[data-store]');
+  if (b) void runXray(b.dataset.store!, b.dataset.name);
 });
 
-async function runXray(id: string, fromStore = false, name?: string) {
-  const a = apps.find((x) => x.id === id);
-  if (!fromStore && !a) return;
+async function runXray(id: string, name?: string) {
   const version = ++xrayVersion;
   clearTimeout(searchTimer);
   searchController?.abort();
   ++searchVersion;
   const out = $('#xrayOut');
   $('#appPicker').hidden = true;
-  const label = fromStore ? name || 'This app' : a!.name;
-  out.innerHTML = `<div class="panel-d" role="status"><h3>${esc(label)}</h3><p class="muted">${fromStore
-    ? 'Reading the privacy policy and checking its clauses… Usually 10–40 seconds.'
-    : 'Loading the saved policy analysis…'}</p></div>`;
+  const label = name || 'This app';
+  out.innerHTML = `<div class="panel-d" role="status"><h3>${esc(label)}</h3><p class="muted">Reading the privacy policy and running live checks… Usually 10–40 seconds.</p></div>`;
   const started = performance.now();
   try {
-    const r = await api<Card>('/api/tools/xray', fromStore ? { store: id } : { app: id }, (msg) => {
+    const r = await api<Card>('/api/tools/xray', { store: id }, (msg) => {
       if (version === xrayVersion) out.innerHTML = `<div class="panel-d" role="status">${esc(msg)}</div>`;
     });
     if (version !== xrayVersion) return;
-    renderXray(out, r, r.cached ? null : performance.now() - started);
+    renderXray(out, r, performance.now() - started);
   } catch (e) {
     if (version !== xrayVersion) return;
     showError(out, e);
@@ -468,7 +356,7 @@ function renderXray(out: HTMLElement, r: Card, ms: number | null) {
     <div class="panel-d">
       <div class="x-head"><span class="mono-g" style="--h:${hue(r.name)}">${esc(initials(r.name))}</span>
         <div><h3>${esc(r.name)}</h3><p>Policy ${esc(r.updated || 'date not stated')} · <a href="${esc(r.url)}" target="_blank" rel="noopener">source</a></p></div></div>
-      <p class="speed" style="margin:12px 0 0"><b>${fmt(r.clauses)} clauses × 12 questions = ${fmt(r.checks)} checks</b> ${ms == null ? '· saved analysis, each flag double-checked' : `in ${secs(ms)}`}</p>
+      <p class="speed" style="margin:12px 0 0"><b>${fmt(r.clauses)} clauses × 12 questions = ${fmt(r.checks)} checks</b> ${ms == null ? '' : `· live in ${secs(ms)}`}</p>
     </div>
     <div class="verdict" style="--c:${r.risks >= 7 ? 'var(--d-bad)' : r.risks >= 4 ? 'var(--d-unsure)' : 'var(--d-good)'}">
       <div class="word">${r.risks} of ${r.riskTotal} risk signals found</div>
@@ -504,7 +392,6 @@ function renderXray(out: HTMLElement, r: Card, ms: number | null) {
 }
 
 // — Job Radar ——————————————————————————————————————————————
-type JobIdx = [string, string, string[]];
 interface JobRes {
   code: string;
   title: string;
@@ -517,98 +404,44 @@ interface JobRes {
   cached: boolean;
 }
 
-const JOB_CHIPS: [string, string][] = [
-  ['Information Security Analyst', '15-1212.00'],
-  ['IT Auditor', '15-1211.00'],
-  ['Compliance Officer', '13-1041.00'],
-  ['Risk Analyst', '13-2054.00'],
-  ['Network Administrator', '15-1244.00'],
-  ['IT Project Manager', '15-1299.09'],
-];
-$('#jobChips').innerHTML = JOB_CHIPS.map(([t, c]) => `<button class="chip" data-code="${c}" data-label="${esc(t)}">${esc(t)}</button>`).join('');
-
-let jobs: JobIdx[] = [];
-openers.jobs = async () => {
-  if (!jobs.length) jobs = await getJson<JobIdx[]>('/demo-data/jobs/index.json').catch(() => []);
-};
-
-function searchJobs(q: string) {
-  const n = q.trim().toLowerCase();
-  if (n.length < 2) return [];
-  const scored: { j: JobIdx; s: number; via?: string }[] = [];
-  for (const j of jobs) {
-    const title = j[1].toLowerCase();
-    let s = title.startsWith(n) ? 100 : title.includes(n) ? 60 : 0;
-    let via: string | undefined;
-    for (const alt of j[2]) {
-      const a = alt.toLowerCase();
-      const as = a === n ? 120 : a.startsWith(n) ? 80 : a.includes(n) ? 40 : 0;
-      if (as > s) {
-        s = as;
-        via = alt;
-      }
-    }
-    if (s) scored.push({ j, s: s - title.length / 100, via });
-  }
-  return scored.sort((a, b) => b.s - a.s).slice(0, 8);
-}
-
-const jobInput = $<HTMLInputElement>('#jobSearch');
-const jobList = $('#jobList');
-let active = -1;
-jobInput.addEventListener('input', () => {
-  const res = searchJobs(jobInput.value);
-  active = -1;
-  jobList.innerHTML = res
-    .map(
-      (r, i) =>
-        `<li role="option" id="jo${i}" aria-selected="false" data-code="${r.j[0]}" data-label="${esc(r.j[1])}">${esc(r.j[1])}${r.via ? `<small>matches “${esc(r.via)}”</small>` : ''}</li>`,
-    )
-    .join('');
-  jobList.hidden = !res.length;
-  jobInput.setAttribute('aria-expanded', String(!!res.length));
+$('#manualJob').addEventListener('click', () => {
+  $('#jobReview').hidden = false;
+  reveal($('#jobReview'));
 });
-jobInput.addEventListener('keydown', (e) => {
-  const items = $$('li', jobList);
-  if (!items.length) return;
-  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
-    e.preventDefault();
-    active = (active + (e.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length;
-    items.forEach((li, i) => li.setAttribute('aria-selected', String(i === active)));
-    jobInput.setAttribute('aria-activedescendant', items[active].id);
-  } else if (e.key === 'Enter') {
-    e.preventDefault();
-    const li = items[Math.max(active, 0)];
-    void pickJob(li.dataset.code!, li.dataset.label!);
-  }
+$('#extractJob').addEventListener('click', async () => {
+  const profile = $<HTMLTextAreaElement>('#jobProfile').value.trim();
+  if (profile.length < 80) return toast('Paste your profile or work description first');
+  const btn = $<HTMLButtonElement>('#extractJob');
+  const out = $('#jobExtractStatus');
+  btn.disabled = true;
+  const t = ticker(out, 0, 'Reading your work experience', 0);
+  try {
+    const r = await api<{ title: string; tasks: string[] }>('/api/tools/jobs', { action: 'extract', profile }, t.retry);
+    $<HTMLInputElement>('#jobSearch').value = r.title;
+    $<HTMLTextAreaElement>('#jobTasks').value = r.tasks.join('\n');
+    $('#jobReview').hidden = false;
+    $('#jobsOut').innerHTML = '';
+    out.innerHTML = '';
+    reveal($('#jobReview'));
+  } catch (e) { showError(out, e); }
+  finally { btn.disabled = false; }
 });
-jobList.addEventListener('click', (e) => {
-  const li = (e.target as Element).closest<HTMLElement>('li');
-  if (li) void pickJob(li.dataset.code!, li.dataset.label!);
-});
-$('#jobChips').addEventListener('click', (e) => {
-  const b = (e.target as Element).closest<HTMLElement>('[data-code]');
-  if (b) void pickJob(b.dataset.code!, b.dataset.label!);
-});
-
-async function pickJob(code: string, label: string) {
-  jobList.hidden = true;
-  jobInput.value = label;
-  jobInput.setAttribute('aria-expanded', 'false');
+$('#jobsGo').addEventListener('click', async () => {
+  const title = $<HTMLInputElement>('#jobSearch').value.trim();
+  const tasks = $<HTMLTextAreaElement>('#jobTasks').value.trim();
+  if (!title || !tasks) return toast('Enter your job title and responsibilities');
+  const btn = $<HTMLButtonElement>('#jobsGo');
+  btn.disabled = true;
   const out = $('#jobsOut');
-  const t = ticker(out, 50, `Sorting every task a ${label} does`, 1500);
+  const t = ticker(out, 0, 'Analyzing your responsibilities', 0);
   const started = performance.now();
   try {
-    const r = await api<JobRes>('/api/tools/jobs', { code }, t.retry);
-    t.stop();
-    if (r.cached) await countUp(out, r.checks, 900);
-    renderJobs(out, r, r.cached ? null : performance.now() - started);
+    const r = await api<JobRes>('/api/tools/jobs', { title, tasks }, t.retry);
+    renderJobs(out, r, performance.now() - started);
     reveal(out);
-  } catch (e) {
-    t.stop();
-    showError(out, e);
-  }
-}
+  } catch (e) { showError(out, e); }
+  finally { btn.disabled = false; }
+});
 
 function renderJobs(out: HTMLElement, r: JobRes, ms: number | null) {
   const B = ['Automate', 'Augment', 'Own'];
@@ -633,7 +466,7 @@ function renderJobs(out: HTMLElement, r: JobRes, ms: number | null) {
   out.innerHTML = `
     <div class="panel-d">
       <h3 style="margin:0;font-size:22px">${esc(r.title)}</h3>
-      <p class="speed" style="margin:6px 0 12px"><b>${r.tasks.length} tasks sorted</b> ${ms == null ? '· part of a run over all 923 jobs' : `in ${secs(ms)}`}</p>
+      <p class="speed" style="margin:6px 0 12px"><b>${r.tasks.length} tasks sorted</b> ${ms == null ? '' : `· live in ${secs(ms)}`}</p>
       <div class="split">${split}</div>
       <p style="margin:12px 0 0;font-size:15px">${
         r.percentile != null ? `More exposed to AI than <b>${pct(r.percentile)}</b> of jobs.` : `Average exposure ${r.exposure.toFixed(1)} of 5.`
@@ -641,7 +474,7 @@ function renderJobs(out: HTMLElement, r: JobRes, ms: number | null) {
     </div>
     <p class="credit" style="margin:-4px 0 0">${B.map((b) => `<span class="b-${b}" style="color:var(--c)">■</span> ${b} ${pct(r.split[b])}`).join(' &nbsp; ')}</p>
     <div class="cols">${B.map(col).join('')}</div>
-    <p class="credit">Task data: O*NET 31.0 Database, U.S. Department of Labor, ETA (CC BY 4.0).</p>
+    <p class="credit">Based on the responsibilities you entered. AI estimates describe tasks, not whether your job will disappear.</p>
     ${deeper(
       `I'm a ${r.title}. An AI sorted my job's tasks and says these could be automated end to end with a human check:\n\n${auto
         .slice(0, 6)
@@ -656,32 +489,6 @@ interface CQ {
   q: string;
   options?: string;
 }
-const PRESETS: Record<string, { text: string; qs: CQ[] }> = {
-  vendor: {
-    text: 'We take security seriously. Customer data is encrypted and we are working toward SOC 2. Backups are stored with a trusted partner and access is limited to staff who need it.',
-    qs: [
-      { type: 'noul', q: 'Does this answer give verifiable evidence (a certification, report or control) rather than assurances?' },
-      { type: 'score', q: 'How complete is this answer for a security questionnaire?' },
-      { type: 'choice', q: 'What should the reviewer do next?', options: 'accept, ask a follow-up, escalate to risk' },
-    ],
-  },
-  log: {
-    text: '2026-09-30T02:14:07Z sshd[2211]: Accepted password for admin from 185.220.101.42 port 51544 ssh2',
-    qs: [
-      { type: 'noul', q: 'Is this log line likely to indicate malicious activity?' },
-      { type: 'choice', q: 'Which category fits best?', options: 'authentication, malware, data exfiltration, configuration change, benign' },
-      { type: 'score', q: 'How urgent is it to investigate?' },
-    ],
-  },
-  email: {
-    text: 'Hi, it\'s Sarah (CFO). I\'m in meetings all day. Please wire $48,500 to our new vendor today; bank details attached. Keep this between us until the deal is announced.',
-    qs: [
-      { type: 'noul', q: 'Is this likely a business email compromise attempt?' },
-      { type: 'choice', q: 'What is the safest response?', options: 'pay it, verify by phone using a known number, reply to the email to confirm' },
-    ],
-  },
-};
-
 let cqs: CQ[] = [{ type: 'noul', q: '' }];
 
 function renderCqs() {
@@ -718,14 +525,6 @@ $('#customQs').addEventListener('click', (e) => {
 });
 $('#addQ').addEventListener('click', () => {
   cqs.push({ type: 'noul', q: '' });
-  renderCqs();
-});
-$('#customPresets').addEventListener('click', (e) => {
-  const b = (e.target as Element).closest<HTMLElement>('[data-preset]');
-  if (!b) return;
-  const p = PRESETS[b.dataset.preset!];
-  $<HTMLTextAreaElement>('#customText').value = p.text;
-  cqs = p.qs.map((q) => ({ ...q }));
   renderCqs();
 });
 $('#customGo').addEventListener('click', () => void runCustom());
@@ -862,4 +661,4 @@ void pollRoom();
 setInterval(() => document.visibilityState === 'visible' && void pollRoom(), 10_000);
 
 // Open deep links only after all tool openers and state are initialized.
-if (TITLES[location.hash.slice(1)]) openSheet(location.hash.slice(1), false);
+if (pageTool) openers[pageTool]?.();
