@@ -3,7 +3,8 @@
 // Functions style, so they also run under `wrangler pages dev`); everything
 // else is the static Astro site in dist/.
 import { DurableObject } from 'cloudflare:workers';
-import type { Env } from '../functions/api/_lib';
+import { deviceId, store, type Env } from '../functions/api/_lib';
+import * as usage from '../functions/api/usage';
 import * as scam from '../functions/api/tools/scam';
 import * as xray from '../functions/api/tools/xray';
 import * as jobs from '../functions/api/tools/jobs';
@@ -22,6 +23,7 @@ const routes: Record<string, Handler | undefined> = {
   'POST /api/tools/jobs': jobs.onRequestPost,
   'POST /api/tools/custom': custom.onRequestPost,
   'POST /api/token': token.onRequestPost,
+  'GET /api/usage': usage.onRequestGet,
   'GET /api/wall': wall.onRequestGet,
   'POST /api/wall': wall.onRequestPost,
   'POST /api/v1/chat/completions': chat.onRequestPost,
@@ -51,7 +53,10 @@ export default {
         status: 503, headers: { 'content-type': 'application/json', 'cache-control': 'no-store', ...cors() },
       });
     }
-    const res = await route({
+    const metered = request.method === 'POST' && url.pathname.startsWith('/api/tools/');
+    const started = Date.now();
+    if (metered) env = { ...env, RUN_METER: {costUsd:0, calls:0, pricedCalls:0, inputTokens:0, outputTokens:0} };
+    let res = await route({
       request,
       env,
       waitUntil: (p: Promise<unknown>) => ctx.waitUntil(p),
@@ -61,6 +66,18 @@ export default {
       functionPath: url.pathname,
       next: () => env.ASSETS.fetch(request),
     } as never);
+    if (metered && env.RUN_METER) {
+      const m = env.RUN_METER;
+      const data = await res.json() as Record<string, unknown>;
+      const elapsedMs = Date.now() - started;
+      const runUsage = {...m, elapsedMs, costComplete:m.calls === m.pricedCalls};
+      const id = deviceId(request);
+      if (id !== 'anon' && m.calls) {
+        const s = await store(env);
+        await Promise.all(Object.entries({...m, elapsedMs, runs:1, decisions:typeof data.checks === 'number' ? data.checks : 0}).map(([k,v]) => s.incr(`usage:${id}:${k}`,v)));
+      }
+      res = new Response(JSON.stringify({...data,runUsage}), {status:res.status, headers:res.headers});
+    }
     // Builders call the passthrough from browsers and tools on other origins.
     if (url.pathname.startsWith('/api/v1/')) for (const [k, v] of Object.entries(cors())) res.headers.set(k, v);
     return res;

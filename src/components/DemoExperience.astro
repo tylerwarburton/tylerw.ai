@@ -63,10 +63,9 @@ console.log(r.choices[0].message.content);`;
         <img class="isaca" src="/demo-data/brand/isaca-va-rev.png" alt="ISACA Virginia Chapter" width="162" height="56" />
         <span class="x" aria-hidden="true">×</span>
         <a class="mark mark-site" href="/"><span class="dot" aria-hidden="true"></span>tylerw.ai</a>
+        <h1 class="d-title">System 1, <span class="live">live</span></h1>
       </div>
-      <h1 class="d-title">System 1, <span class="live">live</span></h1>
-      <p class="d-sub">Fast AI decisions on your own stuff. Your inputs are analyzed live.</p>
-      <p class="d-stat mono" id="roomStat" aria-live="polite"></p>
+      <div class="usage-grid" aria-live="polite"><div><span class="usage-label">The room</span><p class="d-stat mono" id="roomStat">Loading room totals…</p></div><div><span class="usage-label">Your session</span><p class="d-stat mono" id="personalStat">Loading your usage…</p><small>This browser tab · tool usage since tracking started</small></div></div>
     </header>
 
     <!-- ── Play ───────────────────────────────────────────── -->
@@ -226,7 +225,9 @@ Type what you want this to do:</code></pre>
             maxlength="4000"
             placeholder="Paste your email or message here…"
           ></textarea>
-          <button class="btn-d primary wide" id="scamGo">Check for scam</button>
+          <button class="btn-d primary wide" id="scamGo">Run all checks</button>
+          <button class="btn-d wide" id="scamNext">Run next check</button>
+          <p class="muted">Scam → spam → priority. Stops when a message needs review or is filtered out.</p>
           <div class="result" id="scamOut" aria-live="polite"></div>
         </div>
 
@@ -238,24 +239,38 @@ Type what you want this to do:</code></pre>
         </div>
 
         <!-- Job Radar -->
-        <div class="tool" data-tool="jobs" hidden={tool !== 'jobs'}>
-          <label class="lbl" for="jobProfile">Paste your LinkedIn profile, résumé, or work description</label>
-          <p class="muted">On your LinkedIn profile, press Ctrl+A, then Ctrl+C, and paste here. On a Mac, use ⌘A and ⌘C. Your About and Experience sections work too.</p>
-          <textarea id="jobProfile" rows="8" maxlength="40000" placeholder="Paste the copied text here…"></textarea>
-          <p class="muted">We’ll extract responsibilities for you to review. This site does not store your pasted profile text.</p>
-          <button class="btn-d primary wide" id="extractJob">Find my responsibilities</button>
-          <button class="btn-d" id="manualJob" style="margin-top:12px">I’ll write my tasks myself</button>
-          <div id="jobExtractStatus" aria-live="polite"></div>
-          <div id="jobReview" hidden style="margin-top:28px">
-          <h2>Review your responsibilities</h2>
-          <p class="muted">Edit anything we missed or misunderstood, then run a fresh analysis.</p>
-          <label class="lbl" for="jobSearch">Your job title</label>
-          <input class="search" id="jobSearch" type="text" maxlength="120" placeholder="Enter your job title" autocomplete="off" />
-          <label class="lbl" for="jobTasks" style="margin-top:20px">What do you do? One responsibility per line.</label>
-          <textarea id="jobTasks" rows="8" maxlength="12000" placeholder="Paste your actual tasks or responsibilities here…"></textarea>
-          <p class="muted">Your tasks are analyzed live: what AI could automate, where it could assist, and what needs human judgment.</p>
-          <button class="btn-d primary wide" id="jobsGo">Analyze my work</button>
+        <div class="tool job-radar" data-tool="jobs" hidden={tool !== 'jobs'}>
+          <div class="jr-intro">
+            <span class="jr-eyebrow"><span class="jr-live-dot"></span> A live look at your work</span>
+            <h2>Your work.<br /><span>A new perspective.</span></h2>
+            <p>See where AI can take the routine, help you go further, and leave the judgment to you.</p>
           </div>
+          <ol class="jr-steps" aria-label="Analysis progress">
+            <li data-job-step="context" aria-current="step"><span>01</span>Your context</li>
+            <li data-job-step="review"><span>02</span>Review tasks</li>
+            <li data-job-step="results"><span>03</span>Your radar</li>
+          </ol>
+          <section class="jr-input-card" id="jobContext" aria-labelledby="jobContextTitle">
+            <div class="jr-card-heading"><div class="jr-symbol" aria-hidden="true">↗</div><div><h3 id="jobContextTitle">Start with what you do</h3><p>Your experience is the starting point.</p></div></div>
+            <label class="lbl" for="jobProfile">LinkedIn profile, résumé, or work description</label>
+            <textarea id="jobProfile" rows="7" maxlength="40000" placeholder="Paste your About section, experience, or a description of your day-to-day work…"></textarea>
+            <div class="jr-input-meta"><span>Paste text, rather than a profile link</span><span id="jobCharCount">0 / 40,000</span></div>
+            <details class="jr-help"><summary>How to copy your LinkedIn profile</summary><p>Open your own profile. On a computer, press Ctrl+A then Ctrl+C (⌘A and ⌘C on Mac). On a phone, copy the text from About and Experience. Paste it above.</p></details>
+            <button class="btn-d primary wide jr-primary" id="extractJob">Find my responsibilities <span aria-hidden="true">→</span></button>
+            <button class="jr-text-button" id="manualJob">Or write my tasks myself</button>
+            <p class="jr-privacy"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l7 3v6c0 4-3 7-7 9-4-2-7-5-7-9V6z"/><path d="m8 12 3 3 5-6"/></svg>Your pasted profile text is not stored by this site.</p>
+            <div id="jobExtractStatus" aria-live="polite"></div>
+          </section>
+          <section class="jr-input-card" id="jobReview" hidden aria-labelledby="jobReviewTitle">
+            <div class="jr-card-heading"><div class="jr-symbol" aria-hidden="true">✓</div><div><h3 id="jobReviewTitle" tabindex="-1">Make it your own</h3><p>Keep the tasks that reflect your work. Edit or add anything.</p></div></div>
+            <label class="lbl" for="jobSearch">Your job title</label>
+            <input class="search" id="jobSearch" type="text" maxlength="120" placeholder="Your role" autocomplete="off" />
+            <div class="jr-label-row"><label class="lbl" for="jobTasks">Your responsibilities</label><span id="jobTaskCount">0 tasks</span></div>
+            <textarea id="jobTasks" rows="9" maxlength="12000" placeholder="Write one responsibility per line…"></textarea>
+            <p class="jr-input-hint">One task per line · up to 40 tasks</p>
+            <button class="btn-d primary wide jr-primary" id="jobsGo">Build my radar <span aria-hidden="true">→</span></button>
+            <button class="jr-text-button" id="jobBackContext">← Back to my context</button>
+          </section>
           <div class="result" id="jobsOut" aria-live="polite"></div>
         </div>
 
@@ -1239,5 +1254,135 @@ Type what you want this to do:</code></pre>
     .tool-card {
       transition: none;
     }
+  }
+
+  /* Job Radar: a focused, touch-friendly flow. */
+  .demo[data-tool="jobs"] { --d-accent: #71e5d2; max-width: 1080px; }
+  .demo[data-tool="jobs"] .sheet-bar { padding: 0 0 20px; background: transparent; border-bottom: 1px solid #242c36; gap: 8px; }
+  .demo[data-tool="jobs"] .sheet-bar h1 { font-size: 18px; letter-spacing: -.02em; }
+  .demo[data-tool="jobs"] .back { padding-left: 0; color: #9da9bc; font-size: 14px; }
+  .demo[data-tool="jobs"] .sheet-body { padding-top: 28px; }
+  .job-radar { --jr-auto: #a49aff; --jr-augment: #70dded; --jr-own: #81e2b1; }
+  .jr-intro { margin-bottom: 30px; }
+  .jr-eyebrow { display: inline-flex; align-items: center; gap: 8px; color: #9aaabd; text-transform: uppercase; font-size: 11px; letter-spacing: .15em; }
+  .jr-live-dot { width: 6px; height: 6px; background: #71e5d2; border-radius: 50%; box-shadow: 0 0 14px #71e5d255; }
+  .jr-intro h2 { margin: 16px 0 12px; font-size: clamp(36px, 6vw, 60px); line-height: 1.06; letter-spacing: -.055em; font-weight: 500; }
+  .jr-intro h2 span { color: #71e5d2; }
+  .jr-intro > p { color: #a1acbc; max-width: 510px; font-size: 16px; line-height: 1.65; margin: 0; }
+  .jr-steps { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); list-style: none; padding: 0; margin: 0 0 26px; gap: 12px; }
+  .jr-steps li { border-top: 2px solid #28313e; padding-top: 12px; color: #8692a4; font-size: 13px; display: flex; align-items: center; gap: 10px; }
+  .jr-steps li span { font: 11px var(--d-mono); opacity: .8; }
+  .jr-steps li[aria-current="step"] { border-color: #71e5d2; color: #d8fff6; }
+  .jr-steps li[data-complete="true"] { border-color: #3c796f; color: #a4c0bb; }
+  .jr-input-card { max-width: 760px; margin: 0 auto; padding: clamp(20px,4vw,36px); background: linear-gradient(145deg,#19212c,#131922); border: 1px solid #2b3544; border-radius: 24px; box-shadow: 0 20px 70px #0002; }
+  .jr-card-heading { display: flex; gap: 14px; align-items: flex-start; margin-bottom: 26px; }
+  .jr-symbol { flex-shrink: 0; display: grid; place-items: center; width: 42px; height: 42px; border-radius: 13px; background: #71e5d212; border: 1px solid #71e5d22a; color: #71e5d2; font-size: 24px; }
+  .jr-card-heading h3 { font-size: 23px; letter-spacing: -.035em; margin: 0 0 5px; font-weight: 500; }
+  .jr-card-heading p { color: #9ca9bb; font-size: 14px; line-height: 1.5; margin: 0; }
+  .job-radar textarea { line-height: 1.65; border-radius: 14px; background: #0c121b; padding: 16px; border-color: #334052; min-height: 180px; }
+  .job-radar .search { background: #0c121b; border-color: #334052; min-height: 52px; }
+  .job-radar .lbl { color: #d0d9e5; font-size: 13px; }
+  .jr-input-meta { display: flex; justify-content: space-between; gap: 12px; color: #8392a7; font-size: 11px; margin-top: 9px; }
+  #jobCharCount { white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .jr-help { color: #a3b2c5; font-size: 13px; margin: 14px 0 18px; }
+  .jr-help summary { cursor: pointer; padding: 8px 0; min-height: 36px; }
+  .jr-help p { line-height: 1.6; margin: 4px 0 10px; }
+  .demo .jr-primary { min-height: 54px; border-radius: 13px; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 18px; box-shadow: 0 6px 24px #71e5d210; }
+  .jr-primary span { font-size: 21px; }
+  .demo .jr-text-button { display: block; margin: 12px auto 0; border: 0; background: transparent; color: #acbbcf; min-height: 44px; padding: 8px 14px; cursor: pointer; font-size: 13px; }
+  .jr-text-button:hover { color: #71e5d2; }
+  .jr-privacy { display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 11px; color: #8e9caf; margin: 20px 0 0; line-height: 1.5; }
+  .jr-privacy svg { width: 16px; height: 16px; flex-shrink: 0; fill: none; stroke: currentColor; stroke-width: 1.5; }
+  .jr-label-row { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-top: 22px; }
+  .jr-label-row span,.jr-input-hint { color: #8e9caf; font-size: 12px; }
+  .jr-input-hint { margin: 9px 0 18px; }
+  .job-radar #jobsOut { margin-top: 0; gap: 22px; }
+  .jr-summary { display: grid; grid-template-columns: 240px minmax(0,1fr); align-items: center; gap: 32px; padding: 32px; border: 1px solid #314052; border-radius: 24px; background: radial-gradient(ellipse at 10% 20%,#70dded0c,transparent 65%),#151d28; }
+  .jr-ring { width: 240px; max-width: 100%; height: auto; }
+  .jr-ring .jr-ring-number { fill: #eef5ff; font: 500 48px var(--d-sans); letter-spacing: -2px; }
+  .jr-ring .jr-ring-label { fill: #96a8bd; font: 10px var(--d-mono); letter-spacing: 2px; }
+  .jr-result-kicker { color: #71e5d2; text-transform: uppercase; letter-spacing: .14em; font-size: 10px; }
+  .jr-summary h3 { margin: 10px 0; font-size: clamp(24px,4vw,36px); font-weight: 500; letter-spacing: -.045em; line-height: 1.12; overflow-wrap: anywhere; }
+  .jr-summary p { color: #a7b5c7; font-size: 15px; line-height: 1.65; margin: 0 0 14px; }
+  .jr-run-meta { display: flex; flex-wrap: wrap; gap: 8px; color: #98afc4; font: 11px var(--d-mono); }
+  .jr-run-meta span { background: #0c141e; border: 1px solid #293747; border-radius: 6px; padding: 6px 9px; }
+  .jr-stats { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 12px; }
+  .demo .jr-stat { text-align: left; padding: 18px; border-radius: 16px; background: #151d28; border: 1px solid #2c3746; min-height: 128px; cursor: pointer; color: #edf3ff; }
+  .jr-stat[aria-pressed="true"] { border-color: var(--jr-color); background: color-mix(in srgb,var(--jr-color) 8%,#151d28); }
+  .jr-stat-label { display: flex; align-items: center; gap: 7px; font-size: 13px; color: var(--jr-color); }
+  .jr-stat-label i { width: 7px; height: 7px; background: currentColor; border-radius: 50%; }
+  .jr-stat strong { font-size: 34px; line-height: 1.2; font-weight: 500; display: block; margin: 8px 0 4px; letter-spacing: -.04em; }
+  .jr-stat small { color: #91a1b6; font-size: 12px; }
+  .jr-task-heading { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
+  .jr-task-heading h3 { margin: 0; font-size: 20px; font-weight: 500; letter-spacing: -.02em; }
+  .demo .jr-all { border: 1px solid #3b485a; background: transparent; color: #bdd0e7; border-radius: 999px; padding: 8px 14px; min-height: 44px; cursor: pointer; font-size: 12px; }
+  .jr-all[aria-pressed="true"] { background: #263347; border-color: #71839b; }
+  .jr-task-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+  .jr-task-item { display: grid; grid-template-columns: 32px minmax(0,1fr) auto; gap: 14px; align-items: start; padding: 20px; background: #131b25; border: 1px solid #273443; border-radius: 15px; }
+  .jr-task-index { font: 11px var(--d-mono); color: #70859d; padding-top: 4px; }
+  .jr-task-copy p { margin: 0; font-size: 15px; line-height: 1.6; color: #dce5f1; overflow-wrap: anywhere; }
+  .jr-task-copy small { display: block; color: #8094ac; font-size: 11px; margin-top: 9px; }
+  .jr-category { color: var(--jr-color); border: 1px solid color-mix(in srgb,var(--jr-color) 25%,transparent); background: color-mix(in srgb,var(--jr-color) 7%,transparent); padding: 5px 10px; border-radius: 6px; font-size: 11px; white-space: nowrap; }
+  .jr-result-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+  .jr-result-actions .btn-d { border-radius: 10px; min-height: 48px; }
+  .jr-footnote { color: #8293a9; font-size: 12px; line-height: 1.6; margin: 0; }
+  .jr-empty { border: 1px dashed #39495d; border-radius: 14px; padding: 24px; color: #96aac2; text-align: center; }
+  .demo[data-tool="jobs"]:has(.jr-steps [data-job-step="results"][aria-current]) .jr-intro { display: none; }
+  @media (max-width: 640px) {
+    .demo[data-tool="jobs"] { padding: 0 16px 24px; }
+    .demo[data-tool="jobs"] .tool-workspace { padding-top: 12px; }
+    .demo[data-tool="jobs"] .sheet-body { padding-top: 22px; }
+    .jr-intro { margin-bottom: 24px; }
+    .jr-intro > p { font-size: 14px; }
+    .jr-steps { gap: 8px; margin-bottom: 20px; }
+    .jr-steps li { flex-direction: column; align-items: flex-start; gap: 5px; font-size: 12px; }
+    .jr-card-heading { gap: 10px; margin-bottom: 22px; }
+    .jr-card-heading h3 { font-size: 20px; }
+    .jr-symbol { width: 36px; height: 36px; font-size: 20px; }
+    .jr-input-card { border-radius: 20px; padding: 20px 16px; }
+    .jr-input-meta { font-size: 10px; }
+    .jr-privacy { align-items: flex-start; justify-content: flex-start; }
+    .jr-summary { grid-template-columns: 1fr; gap: 12px; padding: 24px 20px; text-align: center; }
+    .jr-ring { width: 210px; margin: 0 auto; }
+    .jr-run-meta { justify-content: center; }
+    .jr-stats { gap: 8px; }
+    .demo .jr-stat { padding: 13px 10px; min-height: 112px; }
+    .jr-stat-label { gap: 5px; font-size: 12px; }
+    .jr-stat strong { font-size: 27px; }
+    .jr-stat small { font-size: 10px; }
+    .jr-task-item { grid-template-columns: 24px minmax(0,1fr); gap: 8px; padding: 16px; }
+    .jr-category { grid-column: 2; justify-self: start; }
+    .jr-task-copy p { font-size: 14px; }
+    .jr-result-actions { display: grid; grid-template-columns: 1fr 1fr; }
+    .jr-result-actions .btn-d { padding: 10px; font-size: 13px; }
+  }
+
+
+  .marks { flex-wrap: wrap; gap: 12px; }
+  .d-title { margin: 0 0 0 auto; font-size: clamp(20px, 3vw, 30px); }
+  .usage-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-top:24px; }
+  .usage-grid > div { border:1px solid var(--d-border); border-radius:14px; padding:16px; }
+  .usage-label { font-size:12px; text-transform:uppercase; letter-spacing:.09em; color:var(--d-muted); }
+  .usage-grid .d-stat { margin:8px 0; line-height:1.7; color:var(--d-text); }
+  .usage-grid small { color:var(--d-muted); font-size:11px; }
+  :global(.run-receipt) { display:flex; flex-wrap:wrap; gap:8px 18px; padding:12px 16px; border:1px solid var(--d-border); border-radius:12px; font-size:12px; color:var(--d-muted); margin-top:12px; }
+  :global(.email-stage) { border:1px solid var(--d-border); border-radius:16px; padding:20px; margin:12px 0; }
+  :global(.email-stage h3) { margin:0 0 8px; }
+  :global(.email-stage p) { margin:8px 0 0; line-height:1.6; }
+  :global(.email-stage[data-state="pass"]) { border-left:4px solid var(--d-good); }
+  :global(.email-stage[data-state="stop"]) { border-left:4px solid var(--d-unsure); }
+  :global(.app-brand) { display:flex; align-items:center; gap:16px; margin-bottom:16px; }
+  :global(.app-brand img) { width:64px; height:64px; border-radius:15px; flex-shrink:0; }
+  :global(.app-brand h3) { margin:0; overflow-wrap:anywhere; }
+  .tool { min-width:0; } textarea,input,select { font-size:16px; }
+  :global(.result) { overflow-wrap:anywhere; }
+  :global(.btn-d) { min-height:44px; }
+  @media(max-width:640px) {
+    .usage-grid { grid-template-columns:1fr; gap:10px; }
+    .marks { gap:8px; } .isaca { height:30px; } .mark-site { font-size:11px; padding:4px 7px; }
+    .d-title { font-size:20px; } .marks .x { display:none; }
+    :global(.cols) { grid-template-columns:1fr; }
+    :global(.cq-top) { flex-wrap:wrap; } :global(.cq-top input) { min-width:0; width:100%; }
+    :global(.panel-d) { padding:18px; } :global(.run-receipt) { font-size:11px; }
   }
 </style>
