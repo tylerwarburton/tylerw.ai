@@ -162,7 +162,7 @@ interface ScamResult {
   ms: number;
 }
 
-type EmailCheck = Partial<ScamResult> & {probability?:number; stage:string; label?:string; pass:boolean; stopped:boolean; band?:string; likelihood?:number; runUsage?:RunUsage};
+type EmailCheck = Partial<ScamResult> & {priority?:Dist; probability?:number; stage:string; label?:string; pass:boolean; stopped:boolean; band?:string; likelihood?:number; runUsage?:RunUsage};
 const emailStages = ['scam','spam','priority'];
 let emailResults:EmailCheck[] = [];
 let emailText = '';
@@ -170,18 +170,25 @@ let emailBusy = false;
 let emailError = '';
 let emailFailureUsage:RunUsage|undefined;
 function renderEmail() {
+  const expanded=new Set($$<HTMLDetailsElement>('#scamOut details[open]').map(el=>el.dataset.stage));
   const usages=[...emailResults.map(r=>r.runUsage),emailFailureUsage].filter((u):u is RunUsage=>!!u);
   const total=usages.reduce((a,u)=>({costUsd:a.costUsd+u.costUsd,elapsedMs:a.elapsedMs+u.elapsedMs,costComplete:a.costComplete&&u.costComplete,calls:a.calls+u.calls,inputTokens:a.inputTokens+u.inputTokens,outputTokens:a.outputTokens+u.outputTokens}),{costUsd:0,elapsedMs:0,costComplete:true,calls:0,inputTokens:0,outputTokens:0});
   $('#scamOut').innerHTML = emailStages.map((stage,i) => {
     const r = emailResults[i];
     const blocked = emailResults.some(x => x.stopped);
     const label = r ? r.label || (r.band === 'legit' ? 'No strong scam signals' : r.band === 'scam' ? 'Likely scam' : 'Uncertain — verify the sender') : blocked ? 'Not run — an earlier check stopped the sequence' : emailBusy && i === emailResults.length ? 'Running live…' : 'Not run';
-    const color = r?.stopped ? 'var(--d-unsure)' : 'var(--d-good)';
+    const score=stage==='scam' ? r?.likelihood ?? 0 : r?.probability ?? 0;
+    const color=score >= .75 ? 'var(--d-bad)' : score > .25 ? 'var(--d-unsure)' : 'var(--d-good)';
     const visual = r && stage === 'scam' ? '<div id="emailScamVisual" class="email-scam-visual"></div>'
       : r && stage === 'spam' ? `<div class="email-filter-result" style="--c:${color}"><strong>${esc(label)}</strong><div class="email-filter-number">${pct(r.probability || 0)}<small>spam likelihood</small></div>${pbar('Spam signals',r.probability || 0,color)}</div>`
       : r && stage === 'priority' ? `<div class="email-priority-options">${['urgent action','routine action','information only'].map((option,j)=>`<div class="email-priority-option ${r.label===option ? 'selected' : ''}" style="--c:${['var(--d-unsure)','var(--d-accent)','var(--d-good)'][j]}"><span aria-hidden="true">${['!','↗','i'][j]}</span><strong>${cap(option)}</strong><small>${['Time-sensitive action','Action without immediate urgency','Read when convenient'][j]}</small>${r.label===option ? '<b>Selected</b>' : ''}</div>`).join('')}</div>`
       : `<p>${esc(label)}</p>`;
-    return `<section class="email-stage" data-state="${r ? r.stopped ? 'stop' : 'pass' : 'pending'}"><h3><span class="email-step-number">${r ? r.stopped ? '!' : '✓' : i+1}</span>${stage[0].toUpperCase()+stage.slice(1)}</h3>${visual}${r ? receipt(r) : ''}</section>`;
+    if (!r) return `<section class="email-stage email-pending"><h3>${i+1}. ${cap(stage)}</h3><p>${esc(label)}</p></section>`;
+    const metric=stage==='priority' ? 'urgent action' : stage;
+    const breakdown=stage==='priority' && r.priority ? `<div class="panel-d">${Object.entries(r.priority).map(([k,p])=>pbar(cap(k),p)).join('')}</div>` : '';
+    return `<details class="email-stage email-collapsible" data-stage="${stage}" style="--c:${color}"${expanded.has(stage) ? ' open' : ''}>
+      <summary><span class="email-summary-label">${i+1}. ${cap(stage)}</span><strong class="email-summary-verdict">${esc(cap(label))}</strong><span class="email-summary-score">${pct(score)}<small>${metric}</small></span><span class="gauge"><i style="left:${score*100}%"></i></span><span class="email-expand-hint"><span class="when-closed">Click to see more ↓</span><span class="when-open">Hide details ↑</span></span></summary>
+      <div class="email-expanded">${visual}${breakdown}${receipt(r)}</div></details>`;
   }).join('') + (usages.length ? '<h4>This sequence</h4>'+receipt({runUsage:total}) : '') + (emailError ? `<div class="err">${esc(emailError)}</div>` : '') + '<p class="credit">Text-only AI assessment. It cannot authenticate a sender or verify links. Confirm sensitive requests through a trusted channel.</p>';
   const scam = emailResults[0];
   if (scam?.kind && scam.pressure && scam.flags) renderScam($('#emailScamVisual'),scam as ScamResult,scam.runUsage?.elapsedMs || scam.ms || 0,emailText);
