@@ -288,7 +288,7 @@ async function searchStore(query: string, version: number) {
     const matches = data.apps as StoreMatch[];
     $('#storeMatches').innerHTML = `<h5>App Store · live policy check</h5>${matches.length
       ? `<p class="muted">Live analysis usually takes 10–40 seconds. Some publishers block policy readers.</p><div class="tiles">${matches.map((a) =>
-        `<button class="tile" data-store="${esc(a.id)}" data-name="${esc(a.name)}" title="${esc(a.seller)}">${appIcon(a.icon, a.name)}${esc(a.name)}<small class="muted">${esc(a.seller)}</small></button>`).join('')}</div>`
+        `<button class="tile" data-store="${esc(a.id)}" data-name="${esc(a.name)}" title="${esc(a.seller)}">${appIcon(a.icon, a.name)}<span class="app-copy"><b>${esc(a.name)}</b><small class="muted">${esc(a.seller)}</small></span></button>`).join('')}</div>`
       : '<p class="muted">No matches. Try another app name.</p>'}`;
   } catch (err) {
     if (controller.signal.aborted || version !== searchVersion) return;
