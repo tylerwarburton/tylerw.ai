@@ -131,7 +131,7 @@ window.addEventListener('popstate', () => {
   if (TITLES[tool]) openSheet(tool, false);
   else if (!$('#sheet').hidden) closeSheet(false);
 });
-if (TITLES[location.hash.slice(1)]) openSheet(location.hash.slice(1), false);
+
 
 // — Shared result pieces ——————————————————————————————————————
 function ticker(el: HTMLElement, total: number, label: string, expectMs: number) {
@@ -347,10 +347,19 @@ openers.xray = async () => {
     $('#appPicker').innerHTML = '<div class="err">App list is still loading. Try again in a moment.</div>';
     return;
   }
-  renderPicker('');
+  renderPicker($<HTMLInputElement>('#appSearch').value);
 };
 
-async function renderPicker(q: string) {
+interface StoreMatch { id: string; name: string; seller: string; genre: string }
+let searchTimer = 0;
+let searchController: AbortController | null = null;
+let searchVersion = 0;
+let xrayVersion = 0;
+
+function renderPicker(q: string) {
+  clearTimeout(searchTimer);
+  searchController?.abort();
+  const version = ++searchVersion;
   const picker = $('#appPicker');
   const needle = q.trim().toLowerCase();
   const list = needle ? apps.filter((a) => a.name.toLowerCase().includes(needle)) : apps;
@@ -365,35 +374,78 @@ async function renderPicker(q: string) {
   html += cats
     .map((c) => `<div class="app-row"><h5>${esc(c)}</h5><div class="tiles">${list.filter((a) => a.category === c).map(tile).join('')}</div></div>`)
     .join('');
-  picker.innerHTML = html || '<p class="muted">No app by that name in tonight\'s list.</p>';
+  picker.innerHTML = html || '<p class="muted">No ready-to-view match. Type at least two letters to search the App Store.</p>';
+  if (needle.length >= 2) {
+    picker.insertAdjacentHTML('beforeend', '<div id="storeMatches" class="app-row" aria-live="polite"><h5>App Store · live policy check</h5><p class="muted">Searching the App Store…</p></div>');
+    searchTimer = window.setTimeout(() => void searchStore(q.trim(), version), 300);
+  }
   picker.hidden = false;
 }
 
+async function searchStore(query: string, version: number) {
+  const controller = new AbortController();
+  searchController = controller;
+  try {
+    const res = await fetch(`/api/apps/search?q=${encodeURIComponent(query)}`, {
+      headers: { 'x-device-id': deviceId() }, signal: controller.signal,
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Search could not load. Try again.');
+    if (version !== searchVersion) return;
+    const matches = (data.apps as StoreMatch[]).filter((a) =>
+      !apps.some((local) => local.name.toLowerCase() === a.name.toLowerCase()));
+    $('#storeMatches').innerHTML = `<h5>App Store · live policy check</h5>${matches.length
+      ? `<p class="muted">New apps usually take 10–40 seconds. Some publishers block policy readers.</p><div class="tiles">${matches.map((a) =>
+        `<button class="tile" data-store="${esc(a.id)}" data-name="${esc(a.name)}" title="${esc(a.seller)}"><span class="mono-g" style="--h:${hue(a.name)}">${esc(initials(a.name))}</span>${esc(a.name)}<small class="muted">${esc(a.seller)}</small></button>`).join('')}</div>`
+      : '<p class="muted">No additional matches. Try another name or choose a ready-to-view app above.</p>'}`;
+  } catch (err) {
+    if (controller.signal.aborted || version !== searchVersion) return;
+    const out = $('#storeMatches');
+    showError(out, err);
+    out.insertAdjacentHTML('beforeend', '<button class="btn-d" data-search-retry>Retry search</button>');
+  }
+}
+
 $('#appSearch').addEventListener('input', (e) => {
+  ++xrayVersion;
   $('#xrayOut').innerHTML = '';
-  void renderPicker((e.target as HTMLInputElement).value);
+  renderPicker((e.target as HTMLInputElement).value);
 });
 $('#appPicker').addEventListener('click', (e) => {
-  const b = (e.target as Element).closest<HTMLElement>('[data-app]');
-  if (b) void runXray(b.dataset.app!);
+  const target = e.target as Element;
+  if (target.closest('[data-search-retry]')) return renderPicker($<HTMLInputElement>('#appSearch').value);
+  const b = target.closest<HTMLElement>('[data-app], [data-store]');
+  if (b) void runXray(b.dataset.app || b.dataset.store!, !!b.dataset.store, b.dataset.name);
 });
 
-async function runXray(id: string) {
+async function runXray(id: string, fromStore = false, name?: string) {
   const a = apps.find((x) => x.id === id);
-  if (!a) return;
+  if (!fromStore && !a) return;
+  const version = ++xrayVersion;
+  clearTimeout(searchTimer);
+  searchController?.abort();
+  ++searchVersion;
   const out = $('#xrayOut');
   $('#appPicker').hidden = true;
-  const total = a.clauses * 12;
-  const t = ticker(out, total, `${a.name}: ${a.clauses} clauses × 12 questions`, Math.max(1500, a.clauses * 12));
+  const label = fromStore ? name || 'This app' : a!.name;
+  out.innerHTML = `<div class="panel-d" role="status"><h3>${esc(label)}</h3><p class="muted">${fromStore
+    ? 'Reading the privacy policy and checking its clauses… Usually 10–40 seconds.'
+    : 'Loading the saved policy analysis…'}</p></div>`;
   const started = performance.now();
   try {
-    const r = await api<Card>('/api/tools/xray', { app: id }, t.retry);
-    t.stop();
-    if (r.cached) await countUp(out, r.checks, 1400);
+    const r = await api<Card>('/api/tools/xray', fromStore ? { store: id } : { app: id }, (msg) => {
+      if (version === xrayVersion) out.innerHTML = `<div class="panel-d" role="status">${esc(msg)}</div>`;
+    });
+    if (version !== xrayVersion) return;
     renderXray(out, r, r.cached ? null : performance.now() - started);
   } catch (e) {
-    t.stop();
+    if (version !== xrayVersion) return;
     showError(out, e);
+    out.insertAdjacentHTML('beforeend', '<button class="btn-d" id="xrayBack">Choose another app</button>');
+    $('#xrayBack').addEventListener('click', () => {
+      out.innerHTML = '';
+      renderPicker($<HTMLInputElement>('#appSearch').value);
+    });
   }
   reveal(out);
 }
@@ -416,7 +468,7 @@ function renderXray(out: HTMLElement, r: Card, ms: number | null) {
     <div class="panel-d">
       <div class="x-head"><span class="mono-g" style="--h:${hue(r.name)}">${esc(initials(r.name))}</span>
         <div><h3>${esc(r.name)}</h3><p>Policy ${esc(r.updated || 'date not stated')} · <a href="${esc(r.url)}" target="_blank" rel="noopener">source</a></p></div></div>
-      <p class="speed" style="margin:12px 0 0"><b>${fmt(r.clauses)} clauses × 12 questions = ${fmt(r.checks)} checks</b> ${ms == null ? '· scored ahead of time, each flag double-checked' : `in ${secs(ms)}`}</p>
+      <p class="speed" style="margin:12px 0 0"><b>${fmt(r.clauses)} clauses × 12 questions = ${fmt(r.checks)} checks</b> ${ms == null ? '· saved analysis, each flag double-checked' : `in ${secs(ms)}`}</p>
     </div>
     <div class="verdict" style="--c:${r.risks >= 7 ? 'var(--d-bad)' : r.risks >= 4 ? 'var(--d-unsure)' : 'var(--d-good)'}">
       <div class="word">${r.risks} of ${r.riskTotal} risk signals found</div>
@@ -808,3 +860,6 @@ async function pollRoom() {
 }
 void pollRoom();
 setInterval(() => document.visibilityState === 'visible' && void pollRoom(), 10_000);
+
+// Open deep links only after all tool openers and state are initialized.
+if (TITLES[location.hash.slice(1)]) openSheet(location.hash.slice(1), false);

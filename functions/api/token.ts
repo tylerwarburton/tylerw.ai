@@ -5,6 +5,7 @@ import { deviceId, fail, handler, json, store } from './_lib';
 export const CALL_CAP = 2000;
 
 export const onRequestPost = handler(async ({ env, request }) => {
+  if (!env.OPENROUTER_API_KEY) return fail(501, 'Live AI is not switched on yet. Please ask the presenter to enable it.');
   const device = deviceId(request);
   if (device === 'anon') return fail(400, 'Missing device id.');
   const s = await store(env);
