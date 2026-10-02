@@ -350,11 +350,11 @@ async function runXray(id: string, name?: string, icon?:string) {
   const out = $('#xrayOut');
   $('#appPicker').hidden = true;
   const label = name || 'This app';
-  out.innerHTML = `<div class="panel-d" role="status"><div class="app-brand">${appIcon(icon,label)}<h3>${esc(label)}</h3></div><p class="muted">Reading the privacy policy and running live checks… Usually 10–40 seconds.</p></div>`;
+  out.innerHTML = `<div class="panel-d" role="status"><div class="app-brand">${appIcon(icon,label)}<h3>${esc(label)}</h3></div><p class="scan-loading"><span class="scan-spinner" aria-hidden="true"></span>Reading the privacy policy and running live checks…</p></div>`;
   const started = performance.now();
   try {
     const r = await api<Card>('/api/tools/xray', { store: id }, (msg) => {
-      if (version === xrayVersion) out.innerHTML = `<div class="panel-d" role="status"><div class="app-brand">${appIcon(icon,label)}<h3>${esc(label)}</h3></div>${esc(msg)}</div>`;
+      if (version === xrayVersion) out.innerHTML = `<div class="panel-d" role="status"><div class="app-brand">${appIcon(icon,label)}<h3>${esc(label)}</h3></div><p class="scan-loading"><span class="scan-spinner" aria-hidden="true"></span>${esc(msg)}</p></div>`;
     });
     if (version !== xrayVersion) return;
     renderXray(out, r, performance.now() - started, icon);
@@ -375,18 +375,18 @@ async function runXray(id: string, name?: string, icon?:string) {
 
 function renderXray(out: HTMLElement, r: Card, ms: number | null, icon?:string) {
   const risky = r.rows.filter((x) => !x.good && x.p >= 0.6).sort((a, b) => b.p - a.p);
-  const light = (x: Card['rows'][number]) =>
-    x.good
-      ? x.p >= 0.6
-        ? 'var(--d-good)'
-        : x.p >= 0.4
-          ? 'var(--d-unsure)'
-          : 'var(--d-border)'
-      : x.p >= 0.6
-        ? 'var(--d-bad)'
-        : x.p >= 0.4
-          ? 'var(--d-unsure)'
-          : 'var(--d-good)';
+  const group = (x:Card['rows'][number]) => x.good ? (x.p >= .6 ? 'green' : 'yellow') : x.p >= .6 ? 'red' : x.p >= .4 ? 'yellow' : 'green';
+  const columns = [
+    {key:'red',title:'Red · Risks',description:'Strong risk signals',color:'var(--d-bad)'},
+    {key:'yellow',title:'Yellow · Review',description:'Uncertain or protection not confirmed',color:'var(--d-unsure)'},
+    {key:'green',title:'Green · Lower concern',description:'Low risk signals or stated protections',color:'var(--d-good)'},
+  ].map(column => {
+    const rows=r.rows.map((x,i)=>({x,i})).filter(({x})=>group(x)===column.key);
+    return `<section class="scan-column" style="--c:${column.color}"><h4>${column.title}<span>${rows.length}</span></h4><p>${column.description}</p>${rows.map(({x,i})=>`<div class="qrow">
+      <button aria-expanded="false" data-row="${i}"><span class="q">${esc(XQ[x.key])}</span><span class="scan-row-status">${x.good ? x.p>=.6 ? 'Protection indicated' : 'Not confirmed' : x.p>=.6 ? 'Risk indicated' : x.p>=.4 ? 'Uncertain' : 'Not indicated'} · ${pct(x.p)} likelihood</span><span class="scan-evidence-hint">View evidence ↓</span></button>
+      <div class="evidence" hidden>${x.evidence ? `“${esc(x.evidence)}”` : 'No supporting passage returned.'}<br /><a href="${esc(r.url)}" target="_blank" rel="noopener">Read the policy</a></div>
+    </div>`).join('') || '<p class="scan-empty">None in this group.</p>'}</section>`;
+  }).join('');
   out.innerHTML = `
     <div class="panel-d">
       <div class="x-head">${appIcon(icon,r.name)}
@@ -397,14 +397,8 @@ function renderXray(out: HTMLElement, r: Card, ms: number | null, icon?:string) 
       <div class="word">${r.risks} of ${r.riskTotal} risk signals found</div>
       <p class="muted" style="margin:8px 0 0">${risky.length ? `Worst: ${risky.slice(0, 3).map((x) => esc(XQ[x.key])).join(' · ')}` : 'No strong risk signals.'}</p>
     </div>
-    <div class="panel-d">${r.rows
-      .map(
-        (x, i) => `<div class="qrow" style="--c:${light(x)}">
-          <button aria-expanded="false" data-row="${i}"><span class="light"></span><span class="q">${esc(XQ[x.key])}${x.good ? ' <span class="muted">(good)</span>' : ''}</span><span class="p">${pct(x.p)}</span></button>
-          <div class="evidence" hidden>“${esc(x.evidence)}”<br /><a href="${esc(r.url)}" target="_blank" rel="noopener">Read the policy</a></div>
-        </div>`,
-      )
-      .join('')}</div>
+    <div class="scan-columns">${columns}</div>
+    <p class="credit">Based on the policy text. Green does not guarantee that an app is safe.</p>
     <button class="btn-d" id="pickAnother">Check another app</button>
     ${deeper(
       `Here are clauses from the ${r.name} privacy policy that an AI flagged. Explain the practical privacy risk of each in plain English, and tell me exactly which settings to change in the ${r.name} app to reduce it:\n\n${risky
