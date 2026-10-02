@@ -269,6 +269,7 @@ export async function completeJson<T>(
     const model = plan[attempt];
     const res = await fetch(OPENROUTER, {
       method: 'POST',
+      signal: AbortSignal.timeout(15000),
       headers: {
         authorization: `Bearer ${env.OPENROUTER_API_KEY}`,
         'content-type': 'application/json',
@@ -288,13 +289,21 @@ export async function completeJson<T>(
         provider: { sort: 'latency', require_parameters: true },
         usage: { include: true },
       }),
-    });
+    }).catch(() => null);
+    if (!res) {
+      lastErr = `${model}: request timed out or could not connect`;
+      continue;
+    }
     if (res.ok) {
-      const out = (await res.json()) as {
+      const out = (await res.json().catch(() => null)) as {
         model: string;
         usage?: Usage;
         choices?: { message?: { content?: string }; finish_reason?: string }[];
-      };
+      } | null;
+      if (!out) {
+        lastErr = `${model}: response could not be read`;
+        continue;
+      }
       const text = out.choices?.[0]?.message?.content ?? '';
       const finish = out.choices?.[0]?.finish_reason;
       await recordSpend(env, out.usage);
