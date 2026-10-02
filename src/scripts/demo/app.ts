@@ -162,7 +162,7 @@ interface ScamResult {
   ms: number;
 }
 
-type EmailCheck = {stage:string; label?:string; pass:boolean; stopped:boolean; band?:string; likelihood?:number; runUsage?:RunUsage};
+type EmailCheck = Partial<ScamResult> & {probability?:number; stage:string; label?:string; pass:boolean; stopped:boolean; band?:string; likelihood?:number; runUsage?:RunUsage};
 const emailStages = ['scam','spam','priority'];
 let emailResults:EmailCheck[] = [];
 let emailText = '';
@@ -176,8 +176,15 @@ function renderEmail() {
     const r = emailResults[i];
     const blocked = emailResults.some(x => x.stopped);
     const label = r ? r.label || (r.band === 'legit' ? 'No strong scam signals' : r.band === 'scam' ? 'Likely scam' : 'Uncertain — verify the sender') : blocked ? 'Not run — an earlier check stopped the sequence' : emailBusy && i === emailResults.length ? 'Running live…' : 'Not run';
-    return `<section class="email-stage" data-state="${r ? r.stopped ? 'stop' : 'pass' : 'pending'}"><h3>${i+1}. ${stage[0].toUpperCase()+stage.slice(1)}</h3><p>${esc(label)}</p>${r?.likelihood != null ? `<p>Estimated scam likelihood: ${pct(r.likelihood)}</p>` : ''}${r ? receipt(r) : ''}</section>`;
+    const color = r?.stopped ? 'var(--d-unsure)' : 'var(--d-good)';
+    const visual = r && stage === 'scam' ? '<div id="emailScamVisual" class="email-scam-visual"></div>'
+      : r && stage === 'spam' ? `<div class="email-filter-result" style="--c:${color}"><strong>${esc(label)}</strong><div class="email-filter-number">${pct(r.probability || 0)}<small>spam likelihood</small></div>${pbar('Spam signals',r.probability || 0,color)}</div>`
+      : r && stage === 'priority' ? `<div class="email-priority-options">${['urgent action','routine action','information only'].map((option,j)=>`<div class="email-priority-option ${r.label===option ? 'selected' : ''}" style="--c:${['var(--d-unsure)','var(--d-accent)','var(--d-good)'][j]}"><span aria-hidden="true">${['!','↗','i'][j]}</span><strong>${cap(option)}</strong><small>${['Time-sensitive action','Action without immediate urgency','Read when convenient'][j]}</small>${r.label===option ? '<b>Selected</b>' : ''}</div>`).join('')}</div>`
+      : `<p>${esc(label)}</p>`;
+    return `<section class="email-stage" data-state="${r ? r.stopped ? 'stop' : 'pass' : 'pending'}"><h3><span class="email-step-number">${r ? r.stopped ? '!' : '✓' : i+1}</span>${stage[0].toUpperCase()+stage.slice(1)}</h3>${visual}${r ? receipt(r) : ''}</section>`;
   }).join('') + (usages.length ? '<h4>This sequence</h4>'+receipt({runUsage:total}) : '') + (emailError ? `<div class="err">${esc(emailError)}</div>` : '') + '<p class="credit">Text-only AI assessment. It cannot authenticate a sender or verify links. Confirm sensitive requests through a trusted channel.</p>';
+  const scam = emailResults[0];
+  if (scam?.kind && scam.pressure && scam.flags) renderScam($('#emailScamVisual'),scam as ScamResult,scam.runUsage?.elapsedMs || scam.ms || 0,emailText);
   $<HTMLButtonElement>('#scamGo').disabled = emailBusy || emailResults.some(r => r.stopped) || emailResults.length === 3;
   $<HTMLButtonElement>('#scamNext').disabled = $<HTMLButtonElement>('#scamGo').disabled;
 }
@@ -210,7 +217,7 @@ function renderScam(out: HTMLElement, r: ScamResult, roundTrip: number, text: st
     r.band === 'scam'
       ? { word: 'Likely scam', c: 'var(--d-bad)' }
       : r.band === 'legit'
-        ? { word: 'Looks legitimate', c: 'var(--d-good)' }
+        ? { word: 'No strong scam signals', c: 'var(--d-good)' }
         : { word: 'Not sure: treat with care', c: 'var(--d-unsure)' };
   const pressure = Object.entries(r.pressure).reduce((a, [k, p]) => a + Number(k) * p, 0);
   const dots = Array.from({ length: 5 }, (_, i) => `<i class="${i < Math.round(pressure) ? 'on' : ''}"></i>`).join('');
@@ -356,7 +363,8 @@ async function runXray(id: string, name?: string, icon?:string) {
     if (version !== xrayVersion) return;
     showError(out, e);
     out.insertAdjacentHTML('afterbegin', `<div class="app-brand">${appIcon(icon,label)}<h3>${esc(label)}</h3></div>`);
-    out.insertAdjacentHTML('beforeend', '<button class="btn-d" id="xrayBack">Choose another app</button>');
+    out.insertAdjacentHTML('beforeend', '<div class="deeper"><button class="btn-d primary" id="xrayRetry">Retry this app</button><button class="btn-d" id="xrayBack">Choose another app</button></div>');
+    $('#xrayRetry').addEventListener('click', () => void runXray(id,name,icon));
     $('#xrayBack').addEventListener('click', () => {
       out.innerHTML = '';
       renderPicker($<HTMLInputElement>('#appSearch').value);
@@ -492,26 +500,16 @@ $('#jobsGo').addEventListener('click', async () => {
 function renderJobs(out: HTMLElement, r: JobRes, ms: number | null) {
   const categories=['Automate','Augment','Own'];
   const colors=['#a49aff','#70dded','#81e2b1'];
-  const descriptions=['AI can do the task, with review','Work together with AI','Human judgment leads'];
-  const counts=categories.map(b=>r.tasks.filter(t=>t.bucket===b).length);
-  let offset=0;
-  const arcs=counts.map((n,i)=>{
-    const size=n/r.tasks.length*100;
-    const arc=`<circle cx="120" cy="120" r="94" fill="none" stroke="${colors[i]}" stroke-width="19" pathLength="100" stroke-dasharray="${size} ${100-size}" stroke-dashoffset="${-offset}" transform="rotate(-90 120 120)"/>`;
-    offset+=size;return arc;
-  }).join('');
-  out.innerHTML=`<div class="jr-summary"><svg class="jr-ring" viewBox="0 0 240 240" role="img" aria-label="${esc(categories.map((b,i)=>`${counts[i]} ${b}`).join(', '))}">${arcs}<text x="120" y="120" text-anchor="middle" class="jr-ring-number">${r.tasks.length}</text><text x="120" y="144" text-anchor="middle" class="jr-ring-label">YOUR TASKS</text></svg><div><span class="jr-result-kicker">Your work, mapped</span><h3>${esc(r.title)}</h3><p>See where AI can help—and where your judgment matters most. Select a category to explore your tasks.</p><div class="jr-run-meta"><span>Live analysis</span><span>${secs(ms || r.ms)}</span></div></div></div>
-  <div class="jr-stats">${categories.map((b,i)=>`<button class="jr-stat" data-job-filter="${b}" aria-pressed="false" style="--jr-color:${colors[i]}"><span class="jr-stat-label"><i></i>${b}</span><strong>${counts[i]}</strong><small>${descriptions[i]}</small></button>`).join('')}</div>
-  <div class="jr-task-heading"><h3>Your responsibilities</h3><button class="jr-all" data-job-filter="all" aria-pressed="true">All tasks</button></div><ol class="jr-task-list"></ol>
-  <p class="jr-footnote">Shares represent task counts, not time saved. AI assessments are estimates about responsibilities, not predictions that a job will disappear.</p><div class="jr-result-actions"><button class="btn-d" id="editJobTasks">Edit my tasks</button><button class="btn-d" id="copyJobResults">Copy results</button></div>`;
-  const show=(filter:string)=> {
-    $('.jr-task-list',out).innerHTML=r.tasks.map((t,i)=>({t,i})).filter(({t})=>filter==='all'||t.bucket===filter).map(({t,i})=>`<li class="jr-task-item"><span class="jr-task-index">${String(i+1).padStart(2,'0')}</span><div class="jr-task-copy"><p>${esc(t.t)}</p><small>${t.borderline ? 'Worth reviewing · ' : ''}${pct(t.p)} model confidence</small></div><span class="jr-category" style="--jr-color:${colors[categories.indexOf(t.bucket)]}">${esc(t.bucket)}</span></li>`).join('') || '<li class="jr-empty">No tasks in this category.</li>';
-    $$('[data-job-filter]',out).forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.jobFilter===filter)));
-  };
-  $$('[data-job-filter]',out).forEach(b=>b.addEventListener('click',()=>show(b.dataset.jobFilter!)));
+  const descriptions=['AI does it; you review','AI helps you do it','You lead'];
+  out.innerHTML=`<div class="job-results-heading"><h3>${esc(r.title)}</h3><span>${r.tasks.length} tasks · ${secs(ms || r.ms)}</span></div>
+  <div class="split">${categories.map((b,i)=>{const share=r.tasks.filter(t=>t.bucket===b).length/r.tasks.length;return `<span style="width:${share*100}%;background:${colors[i]}" title="${b}: ${pct(share)}">${share>=.15 ? pct(share) : ''}</span>`;}).join('')}</div>
+  <div class="job-columns">${categories.map((b,i)=>{
+    const tasks=r.tasks.filter(t=>t.bucket===b).sort((a,b)=>b.p-a.p);
+    return `<section class="job-column" style="--c:${colors[i]}"><h4>${b} · ${tasks.length}</h4><p>${descriptions[i]}</p>${tasks.map(t=>`<div class="task">${esc(t.t)}${t.borderline ? '<span class="tag-b">Worth reviewing</span>' : ''}<div class="conf"><i style="width:${t.p*100}%;background:${colors[i]}"></i></div><small>${pct(t.p)} model confidence</small></div>`).join('') || '<p>No tasks</p>'}</section>`;
+  }).join('')}</div>
+  <p class="credit">AI estimates about your tasks, not a prediction that your job will disappear.</p><div class="jr-result-actions"><button class="btn-d" id="editJobTasks">Edit tasks</button><button class="btn-d" id="copyJobResults">Copy results</button></div>`;
   $('#editJobTasks',out).addEventListener('click',()=>{setJobStep('review');out.innerHTML='';});
   $('#copyJobResults',out).addEventListener('click',()=>void copy(`${r.title}\n\n${r.tasks.map(t=>`${t.bucket}: ${t.t}`).join('\n')}`));
-  show('all');
 }
 
 // — Make your own check ————————————————————————————————————————
@@ -609,69 +607,45 @@ async function runCustom() {
 }
 
 // — Build panel ————————————————————————————————————————————
-let token = '';
-let modelId = 'MODEL_ID';
-
-fetch('/api/v1/models')
-  .then((r) => r.json())
-  .then((d: { data?: { id: string }[] }) => {
-    if (d.data?.[0]) {
-      modelId = d.data[0].id;
-      tokenize();
-    }
-  })
-  .catch(() => {});
-
-const originals = new Map<HTMLElement, string>();
-function tokenize() {
-  $$('[data-tokenize], #envBlock, [data-token-text], [data-model-text]').forEach((el) => {
-    if (!originals.has(el)) originals.set(el, el.textContent ?? '');
-    el.textContent = originals
-      .get(el)!
-      .replaceAll('tmx_your_token_here', token || 'tmx_your_token_here')
-      .replaceAll('MODEL_ID', modelId);
-  });
-  const prompt = $('#starterPrompt').textContent ?? '';
-  $<HTMLAnchorElement>('#starterClaude').href = `https://claude.ai/new?q=${encodeURIComponent(prompt)}`;
-  $<HTMLAnchorElement>('#starterGpt').href = `https://chatgpt.com/?q=${encodeURIComponent(prompt)}`;
-  $('#starterClaude').dataset.copyText = prompt;
-  $('#starterGpt').dataset.copyText = prompt;
-}
-tokenize();
-
-$('#getToken').addEventListener('click', async (e) => {
-  const btn = e.currentTarget as HTMLButtonElement;
-  btn.disabled = true;
+let buildLoading = false;
+let buildReady = false;
+async function prepareBuild() {
+  if(buildLoading || buildReady) return;
+  buildLoading=true;
+  $('#retryBuild').hidden=true;
+  $('#starterPrompt').textContent='Preparing your demo token…';
   try {
-    const r = await api<{ token: string; expires: number; cap: number }>('/api/token', {});
-    token = r.token;
-    const out = $('#tokenOut');
-    out.textContent = token;
-    out.hidden = false;
-    $('#copyToken').hidden = false;
-    btn.textContent = 'Your token';
-    tokenize();
-  } catch (err) {
-    toast(err instanceof Error ? err.message : 'Could not get a token');
-    btn.disabled = false;
-  }
-});
-$('#copyToken').addEventListener('click', () => void copy(token, 'Token copied'));
+    const [r,models]=await Promise.all([
+      api<{token:string}>('/api/token',{}),
+      getJson<{data:{id:string}[]}>('/api/v1/models'),
+    ]);
+    if(!models.data?.[0]?.id) throw new Error('Could not load the demo configuration. Retry.');
+    $('#starterPrompt').textContent=`Build a working app for the task I describe below. Use this OpenAI-compatible API for the app’s live AI checks:
 
-$$<HTMLButtonElement>('.tabs [role="tab"]').forEach((tab) =>
-  tab.addEventListener('click', () => {
-    $$('.tabs [role="tab"]').forEach((t) => t.setAttribute('aria-selected', String(t === tab)));
-    $$('.tabpanel').forEach((p) => (p.hidden = p.id !== tab.dataset.tab));
-  }),
-);
+Base URL: https://tylerw.ai/api/v1
+Demo API token: ${r.token}
+Model: ${models.data[0].id}
+Endpoint: POST /chat/completions
+Authorization: Bearer <demo API token>
+Request: {"model":"${models.data[0].id}","messages":[{"role":"user","content":"Your classification question and input"}],"response_format":{"type":"json_object"}}
 
-$$('[data-copy]').forEach((pre) => {
-  const b = document.createElement('button');
-  b.className = 'btn-d small copy-btn';
-  b.textContent = 'Copy';
-  b.addEventListener('click', () => void copy(pre.querySelector('code')?.textContent ?? ''));
-  pre.appendChild(b);
-});
+Use yes/no probabilities, categories, or 1–5 scores as appropriate. Request structured JSON. Make a simple interface with input, Run, clear results, loading feedback, and errors. All results must come from live API calls.
+
+Use your normal coding capabilities to build the app; do not change your own provider or credentials. Store the demo token in a local environment file excluded from git. This limited demo token expires at midnight Eastern and allows up to 2,000 calls.
+
+Provide the files and commands to run it. If you cannot call the API yourself, give me runnable code; never invent results.
+
+Type what you want this to do:`;
+    buildReady=true;
+    $<HTMLButtonElement>('#copyBuild').disabled=false;
+  } catch(e) {
+    $('#starterPrompt').textContent=e instanceof Error ? e.message : 'Could not prepare your demo token.';
+    $('#retryBuild').hidden=false;
+  } finally {buildLoading=false;}
+}
+$('#build').addEventListener('toggle',()=>{if($<HTMLDetailsElement>('#build').open) void prepareBuild();});
+$('#retryBuild').addEventListener('click',()=>void prepareBuild());
+$('#copyBuild').addEventListener('click',()=>void copy($('#starterPrompt').textContent || '', 'Copied — paste into your AI'));
 
 // — Room pulse (header stat + "recent apps") ——————————————————
 interface Room {

@@ -99,23 +99,44 @@ function appleIcon(value: unknown): string | undefined {
 }
 
 /** App Store page -> the developer's privacy policy URL. */
-export async function policyUrlFor(appId: string): Promise<{ url: string; name: string }> {
-  const res = await fetch(`https://apps.apple.com/us/app/id${appId}`, {
-    headers: { 'user-agent': UA, 'accept-language': 'en-US' },
-    redirect: 'follow',
-    signal: AbortSignal.timeout(10000),
-  });
-  if (!res.ok) throw new HttpError(404, 'Could not open that app on the App Store.');
-  const html = await res.text();
-  const name = decode(html.match(/<meta property="og:title" content="([^"]+)"/)?.[1] ?? '')
-    .replace(/\s*(-|on the)\s*App\s*Store$/i, '')
-    .trim();
+export function parsePolicyLink(raw: string): {url:string;name:string} | null {
+  const name = decode(raw.match(/<meta\s+property="og:title"\s+content="([^"]+)"/i)?.[1] ?? raw.match(/^Title:\s*(.+)$/m)?.[1] ?? '')
+    .replace(/\s*[-–—]\s*App\s*(?:Store|ストア).*$/i,'').replace(/\s+on the App Store$/i,'').trim();
   const link =
-    html.match(/aria-label="Developer[’']s Privacy Policy"[^>]*href="([^"]+)"/i)?.[1] ??
-    html.match(/href="([^"]+)"[^>]*aria-label="Developer[’']s Privacy Policy"/i)?.[1] ??
-    html.match(/"privacyPolicyUrl":"([^"]+)"/)?.[1]?.replace(/\\u002F/g, '/');
-  if (!link) throw new HttpError(404, 'This app does not list a privacy policy on the App Store.');
-  return { url: decode(link), name };
+    raw.match(/aria-label="Developer[’']s Privacy Policy"[^>]*href="([^"]+)"/i)?.[1] ??
+    raw.match(/href="([^"]+)"[^>]*aria-label="Developer[’']s Privacy Policy"/i)?.[1] ??
+    raw.match(/"privacyPolicyUrl"\s*:\s*"([^"]+)"/)?.[1]?.replace(/\\u002F/g,'/').replace(/\\\//g,'/') ??
+    raw.match(/\[Developer[’']s\s+Privacy Policy[^\]]*\]\((https?:\/\/[^\s)]+)(?:\s+[^)]*)?\)/i)?.[1] ??
+    raw.match(/\[Privacy Policy[^\]]*\]\((https?:\/\/[^\s)]+)(?:\s+[^)]*)?\)/i)?.[1];
+  if (!link) return null;
+  try {
+    const url = new URL(decode(link));
+    // Apple footer links are not the app developer's policy.
+    const explicitDeveloper = /aria-label="Developer[’']s Privacy Policy"|"privacyPolicyUrl"|\[Developer[’']s\s+Privacy Policy/i.test(raw);
+    if (!/^https?:$/.test(url.protocol) || (!explicitDeveloper && /^(?:www\.)?apple\.com$/.test(url.hostname))) return null;
+    return {url:url.toString(),name};
+  } catch {return null;}
+}
+
+export async function policyUrlFor(appId: string, readerKey?:string): Promise<{ url: string; name: string }> {
+  const url=`https://apps.apple.com/us/app/id${appId}`;
+  let readable=false;
+  for (const reader of [false,true]) {
+    try {
+      const res=await fetch(reader ? `https://r.jina.ai/${url}` : url, {
+        headers:reader ? {accept:'text/plain',...(readerKey ? {authorization:`Bearer ${readerKey}`} : {})} : {accept:'text/html','accept-language':'en-US'},
+        redirect:'follow',signal:AbortSignal.timeout(reader ? 15000 : 8000),
+      });
+      if (!res.ok) continue;
+      const raw=(await res.text()).slice(0,MAX_BYTES);
+      if (/returned error (4|5)\d\d/i.test(raw.slice(0,500))) continue;
+      const parsed=parsePolicyLink(raw);
+      if (parsed) return parsed;
+      if (/app privacy|developer.{0,15}privacy|privacyPolicyUrl/i.test(raw)) readable=true;
+    } catch { /* Try the independent public reader if Apple is unavailable. */ }
+  }
+  if (readable) throw new HttpError(422,'The App Store page did not expose a readable developer privacy-policy link. Try another app.');
+  throw new HttpError(503,'The App Store could not load this app right now. Please retry this app.');
 }
 
 /**

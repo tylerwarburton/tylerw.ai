@@ -4,42 +4,6 @@ import Base from '../layouts/Base.astro';
 const { tool = '' } = Astro.props;
 const titles: Record<string, string> = { scam: 'Scam Check', xray: 'App Privacy X-ray', jobs: 'Job Radar', custom: 'Make your own check' };
 
-// Code samples live here: Astro would read their braces as expressions.
-const code0 = `curl https://tylerw.ai/api/v1/chat/completions \\
-  -H "Authorization: Bearer $OPENAI_API_KEY" \\
-  -H "Content-Type: application/json" \\
-  -d '{
-    "messages": [
-      {"role": "system", "content": "Answer with only a probability from 0 to 1."},
-      {"role": "user", "content": "Is this a scam? Your package is held. Pay $1.99 at usps-redelivery.co"}
-    ]
-  }'`;
-const code1 = `from openai import OpenAI
-
-client = OpenAI()  # reads OPENAI_BASE_URL and OPENAI_API_KEY
-
-r = client.chat.completions.create(
-    model="MODEL_ID",
-    messages=[
-        {"role": "system", "content": "Reply with JSON: {\\"scam\\": probability 0-1, \\"why\\": short reason}"},
-        {"role": "user", "content": "Your package is held. Pay $1.99 at usps-redelivery.co"},
-    ],
-    response_format={"type": "json_object"},
-)
-print(r.choices[0].message.content)`;
-const code2 = `import OpenAI from "openai";
-
-const client = new OpenAI(); // reads OPENAI_BASE_URL and OPENAI_API_KEY
-
-const r = await client.chat.completions.create({
-  model: "MODEL_ID",
-  messages: [
-    { role: "system", content: "Reply with JSON: {\\"scam\\": probability 0-1, \\"why\\": short reason}" },
-    { role: "user", content: "Your package is held. Pay $1.99 at usps-redelivery.co" },
-  ],
-  response_format: { type: "json_object" },
-});
-console.log(r.choices[0].message.content);`;
 ---
 
 <Base
@@ -110,88 +74,11 @@ console.log(r.choices[0].message.content);`;
     <!-- ── Build ──────────────────────────────────────────── -->
     <section hidden={!!tool} class="build" aria-labelledby="buildTitle">
       <details id="build">
-        <summary>
-          <span>
-            <span class="sec-title" id="buildTitle">Build</span>
-            <span class="b-sub">Get a demo key and use these models in your own tools, tonight.</span>
-          </span>
-          <span class="chev" aria-hidden="true"></span>
-        </summary>
-
-        <div class="b-body">
-          <div class="step">
-            <h3><span class="n mono">1</span> Your demo token</h3>
-            <p class="muted">Works until midnight, up to 2,000 calls. It points at a proxy, never at a real key.</p>
-            <div class="token-row">
-              <button class="btn-d primary" id="getToken">Get my token</button>
-              <code class="token mono" id="tokenOut" hidden></code>
-              <button class="btn-d" id="copyToken" hidden>Copy</button>
-            </div>
-            <pre class="code" data-copy><code id="envBlock">export OPENAI_BASE_URL=https://tylerw.ai/api/v1
-export OPENAI_API_KEY=tmx_your_token_here</code></pre>
-          </div>
-
-          <div class="step">
-            <h3><span class="n mono">2</span> Plug it into your tools</h3>
-            <div class="tabs" role="tablist">
-              <button role="tab" aria-selected="true" data-tab="t-curl">curl</button>
-              <button role="tab" aria-selected="false" data-tab="t-py">Python</button>
-              <button role="tab" aria-selected="false" data-tab="t-js">JavaScript</button>
-              <button role="tab" aria-selected="false" data-tab="t-app">Apps</button>
-              <button role="tab" aria-selected="false" data-tab="t-chat">ChatGPT / Claude</button>
-            </div>
-            <div class="tabpanel" id="t-curl">
-              <p class="muted">One call, 1 judgment. Swap the message for anything.</p>
-              <pre class="code" data-copy><code data-tokenize>{code0}</code></pre>
-            </div>
-            <div class="tabpanel" id="t-py" hidden>
-              <p class="muted"><code class="mono">pip install openai</code>, then:</p>
-              <pre class="code" data-copy><code data-tokenize>{code1}</code></pre>
-            </div>
-            <div class="tabpanel" id="t-js" hidden>
-              <p class="muted"><code class="mono">npm i openai</code>, then:</p>
-              <pre class="code" data-copy><code data-tokenize>{code2}</code></pre>
-            </div>
-            <div class="tabpanel" id="t-app" hidden>
-              <p class="muted">Any app with an "OpenAI-compatible" or "custom provider" setting (Cursor, Continue, Open WebUI, Raycast, the <code class="mono">llm</code> CLI and more) takes these three values:</p>
-              <dl class="kv">
-                <div><dt>Base URL</dt><dd class="mono">https://tylerw.ai/api/v1</dd></div>
-                <div><dt>API key</dt><dd class="mono" data-token-text>tmx_your_token_here</dd></div>
-                <div><dt>Model</dt><dd class="mono" data-model-text>MODEL_ID</dd></div>
-              </dl>
-            </div>
-            <div class="tabpanel" id="t-chat" hidden>
-              <p class="muted">No install. Paste the starter prompt below into ChatGPT or Claude and build a checker for your own job.</p>
-            </div>
-          </div>
-
-          <div class="step">
-            <h3><span class="n mono">3</span> Starter prompt</h3>
-            <p class="muted">Get your token above, then copy this prompt into your coding assistant. Add what you want to build at the end.</p>
-            <pre class="code prompt" data-copy><code id="starterPrompt" data-tokenize>I just saw a "System 1" demo: small, fast AI models used as judgment engines, not chatbots. Instead of writing paragraphs, they answer structured questions with probabilities in well under a second, so you can run thousands of checks cheaply.
-
-There are three question types:
-- Yes/No: the probability something is true ("Does this clause share data with advertisers?")
-- Pick one: a probability for each option ("What kind of message is this? bank alert / package / fake job / legitimate")
-- Score: a 1-5 rating with a probability per level ("How urgent is this?")
-
-I have an OpenAI-compatible endpoint for tonight:
-  base URL: https://tylerw.ai/api/v1
-  API key:  tmx_your_token_here
-  model:    MODEL_ID
-
-Build a small, working prototype for the task I describe below. Use the endpoint, demo token and model above for the app's AI calls via POST /chat/completions. Use my coding assistant's normal subscription to write the code; do not reconfigure the assistant itself to use this endpoint.
-
-Keep the interface simple: input, a clear Run button, structured results, loading feedback and readable errors. Choose precise yes/no, category or score questions and request JSON probabilities. Put the demo token in a local environment file excluded from git; do not commit it. The token expires at midnight Eastern and has a 2,000-call cap.
-
-Give me the complete files, install/run commands and a small example I can try immediately. Include a way to compare results with examples I label myself. If your environment cannot execute external API calls, create runnable code and explain how I can run it locally; do not invent API results.
-
-Type what you want this to do:</code></pre>
-            <div class="row-btns">
-              <a class="btn-d" id="starterClaude" target="_blank" rel="noopener" href="https://claude.ai/new">Open in Claude</a>
-              <a class="btn-d" id="starterGpt" target="_blank" rel="noopener" href="https://chatgpt.com/">Open in ChatGPT</a>
-            </div>
-          </div>
+        <summary><span class="sec-title" id="buildTitle">Build</span><span class="chev" aria-hidden="true"></span></summary>
+        <div class="b-body build-simple">
+          <pre class="code prompt"><code id="starterPrompt" aria-live="polite">Preparing your demo token…</code></pre>
+          <button class="btn-d primary" id="copyBuild" disabled>Copy for Codex, Claude, or your AI</button>
+          <button class="btn-d" id="retryBuild" hidden>Retry</button>
         </div>
       </details>
     </section>
@@ -213,7 +100,6 @@ Type what you want this to do:</code></pre>
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7" /></svg> All tools
         </a>
         <h1 id="sheetTitle">{titles[tool]}</h1>
-        <span></span>
       </div>
       <div class="sheet-body">
         <!-- Scam Check -->
@@ -240,21 +126,15 @@ Type what you want this to do:</code></pre>
 
         <!-- Job Radar -->
         <div class="tool job-radar" data-tool="jobs" hidden={tool !== 'jobs'}>
-          <div class="jr-intro">
-            <span class="jr-eyebrow"><span class="jr-live-dot"></span> A live look at your work</span>
-            <h2>Your work.<br /><span>A new perspective.</span></h2>
-            <p>See where AI can take the routine, help you go further, and leave the judgment to you.</p>
-          </div>
           <ol class="jr-steps" aria-label="Analysis progress">
             <li data-job-step="context" aria-current="step"><span>01</span>Your context</li>
             <li data-job-step="review"><span>02</span>Review tasks</li>
             <li data-job-step="results"><span>03</span>Your radar</li>
           </ol>
-          <section class="jr-input-card" id="jobContext" aria-labelledby="jobContextTitle">
-            <div class="jr-card-heading"><div class="jr-symbol" aria-hidden="true">↗</div><div><h3 id="jobContextTitle">Start with what you do</h3><p>Your experience is the starting point.</p></div></div>
-            <label class="lbl" for="jobProfile">LinkedIn profile, résumé, or work description</label>
-            <textarea id="jobProfile" rows="7" maxlength="40000" placeholder="Paste your About section, experience, or a description of your day-to-day work…"></textarea>
-            <div class="jr-input-meta"><span>Paste text, rather than a profile link</span><span id="jobCharCount">0 / 40,000</span></div>
+          <section class="jr-input-card" id="jobContext" aria-labelledby="jobProfileLabel">
+            <label class="lbl" id="jobProfileLabel" for="jobProfile">Paste your entire LinkedIn profile or résumé here.</label>
+            <textarea id="jobProfile" rows="7" maxlength="40000" placeholder="Paste your profile or résumé text…"></textarea>
+            <div class="jr-input-meta"><span>Paste the text, not a link</span><span id="jobCharCount">0 / 40,000</span></div>
             <details class="jr-help"><summary>How to copy your LinkedIn profile</summary><p>Open your own profile. On a computer, press Ctrl+A then Ctrl+C (⌘A and ⌘C on Mac). On a phone, copy the text from About and Experience. Paste it above.</p></details>
             <button class="btn-d primary wide jr-primary" id="extractJob">Find my responsibilities <span aria-hidden="true">→</span></button>
             <button class="jr-text-button" id="manualJob">Or write my tasks myself</button>
@@ -262,13 +142,13 @@ Type what you want this to do:</code></pre>
             <div id="jobExtractStatus" aria-live="polite"></div>
           </section>
           <section class="jr-input-card" id="jobReview" hidden aria-labelledby="jobReviewTitle">
-            <div class="jr-card-heading"><div class="jr-symbol" aria-hidden="true">✓</div><div><h3 id="jobReviewTitle" tabindex="-1">Make it your own</h3><p>Keep the tasks that reflect your work. Edit or add anything.</p></div></div>
+            <div class="jr-card-heading"><div class="jr-symbol" aria-hidden="true">✓</div><div><h3 id="jobReviewTitle" tabindex="-1">Review your tasks</h3><p>Edit or remove anything that is wrong.</p></div></div>
             <label class="lbl" for="jobSearch">Your job title</label>
             <input class="search" id="jobSearch" type="text" maxlength="120" placeholder="Your role" autocomplete="off" />
             <div class="jr-label-row"><label class="lbl" for="jobTasks">Your responsibilities</label><span id="jobTaskCount">0 tasks</span></div>
             <textarea id="jobTasks" rows="9" maxlength="12000" placeholder="Write one responsibility per line…"></textarea>
             <p class="jr-input-hint">One task per line · up to 40 tasks</p>
-            <button class="btn-d primary wide jr-primary" id="jobsGo">Build my radar <span aria-hidden="true">→</span></button>
+            <button class="btn-d primary wide jr-primary" id="jobsGo">Analyze my tasks <span aria-hidden="true">→</span></button>
             <button class="jr-text-button" id="jobBackContext">← Back to my context</button>
           </section>
           <div class="result" id="jobsOut" aria-live="polite"></div>
@@ -729,21 +609,23 @@ Type what you want this to do:</code></pre>
 
   /* Dedicated tool pages */
   .tool-page { max-width: 1040px; }
-  .tool-workspace { padding: 24px 0 48px; }
+  .tool-workspace { padding: 4px 0 32px; }
   .app-icon { width: 56px; height: 56px; object-fit: cover; border-radius: 13px; }
   .tool-card { color: inherit; text-decoration: none; }
   .back { text-decoration: none; }
   .sheet-bar {
-    display: grid;
-    grid-template-columns: 1fr; gap: 20px;
+    display: flex;
+    gap: 16px;
     align-items: center;
-    padding: 10px 12px;
+    min-height: 48px;
+    padding: 0;
     border-bottom: 1px solid var(--d-border);
-    background: var(--d-panel);
+    background: transparent;
   }
   .sheet-bar h1 {
     margin: 0;
-    font-size: clamp(28px, 5vw, 44px);
+    font-size: clamp(16px, 2.5vw, 21px);
+    line-height: 1.2;
     font-weight: 600;
   }
   .back {
@@ -768,7 +650,7 @@ Type what you want this to do:</code></pre>
   }
   .sheet-body {
     flex: 1;
-    padding: 28px 0 48px;
+    padding: 16px 0 32px;
     -webkit-overflow-scrolling: touch;
   }
 
@@ -1258,10 +1140,10 @@ Type what you want this to do:</code></pre>
 
   /* Job Radar: a focused, touch-friendly flow. */
   .demo[data-tool="jobs"] { --d-accent: #71e5d2; max-width: 1080px; }
-  .demo[data-tool="jobs"] .sheet-bar { padding: 0 0 20px; background: transparent; border-bottom: 1px solid #242c36; gap: 8px; }
+  .demo[data-tool="jobs"] .sheet-bar { padding: 0; background: transparent; border-bottom: 1px solid #242c36; gap: 8px; }
   .demo[data-tool="jobs"] .sheet-bar h1 { font-size: 18px; letter-spacing: -.02em; }
   .demo[data-tool="jobs"] .back { padding-left: 0; color: #9da9bc; font-size: 14px; }
-  .demo[data-tool="jobs"] .sheet-body { padding-top: 28px; }
+  .demo[data-tool="jobs"] .sheet-body { padding-top: 16px; }
   .job-radar { --jr-auto: #a49aff; --jr-augment: #70dded; --jr-own: #81e2b1; }
   .jr-intro { margin-bottom: 30px; }
   .jr-eyebrow { display: inline-flex; align-items: center; gap: 8px; color: #9aaabd; text-transform: uppercase; font-size: 11px; letter-spacing: .15em; }
@@ -1385,4 +1267,43 @@ Type what you want this to do:</code></pre>
     :global(.cq-top) { flex-wrap:wrap; } :global(.cq-top input) { min-width:0; width:100%; }
     :global(.panel-d) { padding:18px; } :global(.run-receipt) { font-size:11px; }
   }
+
+  .sheet-bar .back { flex-shrink:0; padding:0 8px 0 0; font-size:13px; }
+  .sheet-bar h1 { min-width:0; }
+  .email-stage h3 { display:flex; align-items:center; gap:10px; font-size:16px; }
+  .email-step-number { display:inline-grid; place-items:center; width:28px; height:28px; border-radius:50%; background:#253044; color:var(--d-text); font:13px var(--d-mono); }
+  .email-scam-visual { display:grid; gap:12px; margin-top:16px; }
+  .email-stage .run-receipt { margin-top:14px; }
+  .email-filter-result { margin-top:16px; }
+  .email-filter-result > strong { color:var(--c); font-size:22px; }
+  .email-filter-number { font:600 48px var(--d-mono); margin:12px 0; }
+  .email-filter-number small { color:var(--d-muted); font:13px var(--d-sans); margin-left:12px; }
+  .email-priority-options { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; margin-top:16px; }
+  .email-priority-option { display:flex; flex-direction:column; gap:8px; padding:16px; border:1px solid var(--d-border); border-radius:12px; color:var(--d-muted); }
+  .email-priority-option.selected { border-color:var(--c); background:color-mix(in srgb,var(--c) 8%,var(--d-panel)); color:var(--d-text); }
+  .email-priority-option > span { font:24px var(--d-mono); }
+  .email-priority-option.selected > span,.email-priority-option b { color:var(--c); }
+  .email-priority-option small { font-size:12px; line-height:1.5; }
+  .email-priority-option b { font-size:11px; text-transform:uppercase; letter-spacing:.08em; }
+  @media(max-width:640px) {
+    .sheet-bar { gap:10px; } .sheet-bar h1,.demo[data-tool="jobs"] .sheet-bar h1 { font-size:16px; }
+    .email-stage { padding:14px; }
+    .email-priority-options { grid-template-columns:1fr; }
+    .email-priority-option { display:grid; grid-template-columns:24px 1fr; gap:4px 10px; padding:12px; }
+    .email-priority-option > span { grid-row:span 3; } .email-priority-option small,.email-priority-option b { grid-column:2; }
+    .email-scam-visual .facts { grid-template-columns:1fr 1fr; }
+  }
+
+  .build-simple { padding-top:16px; }
+  .build-simple .code { margin:0 0 12px; white-space:pre-wrap; overflow-wrap:anywhere; padding:18px; }
+  .job-columns { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px; }
+  .job-column { background:var(--d-panel); border:1px solid var(--d-border); border-top:3px solid var(--c); border-radius:14px; padding:18px; min-width:0; }
+  .job-column h4 { color:var(--c); font-size:17px; margin:0 0 4px; }
+  .job-column > p { font-size:12px; color:var(--d-muted); margin:0 0 18px; }
+  .job-column .task { padding:14px 0; line-height:1.6; border-top:1px solid var(--d-border); overflow-wrap:anywhere; }
+  .job-column .task small { color:var(--d-muted); font-size:11px; }
+  .job-column .conf { margin:8px 0 4px; }
+  .job-results-heading { display:flex; justify-content:space-between; align-items:baseline; gap:12px; flex-wrap:wrap; }
+  .job-results-heading h3 { margin:0; font-size:22px; } .job-results-heading span { color:var(--d-muted); font-size:13px; }
+  @media(max-width:700px) { .job-columns { grid-template-columns:1fr; } }
 </style>
