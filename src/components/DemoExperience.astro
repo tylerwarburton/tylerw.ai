@@ -239,12 +239,23 @@ Type what you want this to do:</code></pre>
 
         <!-- Job Radar -->
         <div class="tool" data-tool="jobs" hidden={tool !== 'jobs'}>
+          <label class="lbl" for="jobProfile">Paste your LinkedIn profile, résumé, or work description</label>
+          <p class="muted">On your LinkedIn profile, press Ctrl+A, then Ctrl+C, and paste here. On a Mac, use ⌘A and ⌘C. Your About and Experience sections work too.</p>
+          <textarea id="jobProfile" rows="8" maxlength="40000" placeholder="Paste the copied text here…"></textarea>
+          <p class="muted">We’ll extract responsibilities for you to review. This site does not store your pasted profile text.</p>
+          <button class="btn-d primary wide" id="extractJob">Find my responsibilities</button>
+          <button class="btn-d" id="manualJob" style="margin-top:12px">I’ll write my tasks myself</button>
+          <div id="jobExtractStatus" aria-live="polite"></div>
+          <div id="jobReview" hidden style="margin-top:28px">
+          <h2>Review your responsibilities</h2>
+          <p class="muted">Edit anything we missed or misunderstood, then run a fresh analysis.</p>
           <label class="lbl" for="jobSearch">Your job title</label>
           <input class="search" id="jobSearch" type="text" maxlength="120" placeholder="Enter your job title" autocomplete="off" />
           <label class="lbl" for="jobTasks" style="margin-top:20px">What do you do? One responsibility per line.</label>
           <textarea id="jobTasks" rows="8" maxlength="12000" placeholder="Paste your actual tasks or responsibilities here…"></textarea>
           <p class="muted">Your tasks are analyzed live: what AI could automate, where it could assist, and what needs human judgment.</p>
           <button class="btn-d primary wide" id="jobsGo">Analyze my work</button>
+          </div>
           <div class="result" id="jobsOut" aria-live="polite"></div>
         </div>
 

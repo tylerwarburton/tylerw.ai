@@ -404,6 +404,28 @@ interface JobRes {
   cached: boolean;
 }
 
+$('#manualJob').addEventListener('click', () => {
+  $('#jobReview').hidden = false;
+  reveal($('#jobReview'));
+});
+$('#extractJob').addEventListener('click', async () => {
+  const profile = $<HTMLTextAreaElement>('#jobProfile').value.trim();
+  if (profile.length < 80) return toast('Paste your profile or work description first');
+  const btn = $<HTMLButtonElement>('#extractJob');
+  const out = $('#jobExtractStatus');
+  btn.disabled = true;
+  const t = ticker(out, 0, 'Reading your work experience', 0);
+  try {
+    const r = await api<{ title: string; tasks: string[] }>('/api/tools/jobs', { action: 'extract', profile }, t.retry);
+    $<HTMLInputElement>('#jobSearch').value = r.title;
+    $<HTMLTextAreaElement>('#jobTasks').value = r.tasks.join('\n');
+    $('#jobReview').hidden = false;
+    $('#jobsOut').innerHTML = '';
+    out.innerHTML = '';
+    reveal($('#jobReview'));
+  } catch (e) { showError(out, e); }
+  finally { btn.disabled = false; }
+});
 $('#jobsGo').addEventListener('click', async () => {
   const title = $<HTMLInputElement>('#jobSearch').value.trim();
   const tasks = $<HTMLTextAreaElement>('#jobTasks').value.trim();
