@@ -103,6 +103,7 @@ export async function score(env: Parameters<typeof completeJson>[0], policy: Pol
       'For delete and opt_out, stated or conditional means the control exists; summarize any limits. Distinguish general settings from an explicit advertising opt-out.',
       'For sells, distinguish sale from ad sharing; if sale is denied but ad sharing occurs, say both and use conditional or unclear. Service providers, public posts, and merger transfers are not by themselves sale or targeted-ad sharing.',
       'Precise location excludes approximate IP location. Biometrics require biometric identification data, not ordinary media. Legal disclosures and legal/safety retention exceptions are conditional. Read related clauses together before deciding.',
+      'A summary describing user choice, enabling a setting, consent, or an optional upload must be conditional, not stated. On follow-up, check assessment and summary for this mismatch.',
       'Set needsVerification to true if the cited passage does not clearly support the summary or conflicting passages remain unresolved. If reviewing prior findings, resolve them against the supplied policy; retain unclear when the text cannot settle them.',
       'Write one concise sentence per summary, at most 30 words, stating what the policy says and its conditions. Do not invent facts. clause is the zero-based index of the strongest actual source passage; use -1 only when no supporting passage exists.',
     ].join(' '),
@@ -112,11 +113,12 @@ export async function score(env: Parameters<typeof completeJson>[0], policy: Pol
     validate:d=>!!d && Array.isArray(d.rows) && d.rows.length===keys.length && new Set(d.rows.map(r=>r.key)).size===keys.length && d.rows.every(r=>keys.includes(r.key) && ['stated','conditional','denied','not_found','unclear'].includes(r.assessment) && typeof r.needsVerification==='boolean' && typeof r.summary==='string' && Number.isInteger(r.clause) && r.clause>=-1 && r.clause<policy.clauses.length && (r.clause>=0 || ['not_found','unclear'].includes(r.assessment))),
   });
   const initial=await review(keys);
-  const unresolved=initial.data.rows.filter(row=>row.assessment==='unclear' || row.needsVerification);
+  const conditionalSummary=(row:ContextRow)=>row.assessment==='stated' && /\b(only (if|when)|when you|if you|you (can|may) (choose|upload|enable|opt)|consent|optional|opt[ -]in|enabl(?:e|ed|ing)|choose to)\b/i.test(row.summary);
+  const unresolved=initial.data.rows.filter(row=>row.assessment==='unclear' || row.needsVerification || conditionalSummary(row));
   const verified=unresolved.length ? (await review(unresolved.map(row=>row.key),unresolved)).data.rows : [];
   const contextualRows=keys.map(key=>{
     const found=verified.find(row=>row.key===key) || initial.data.rows.find(row=>row.key===key)!;
-    return {key,good:GOOD.has(key),assessment:found.needsVerification?'unclear':found.assessment,
+    return {key,good:GOOD.has(key),assessment:(found.needsVerification || conditionalSummary(found))?'unclear':found.assessment,
       summary:found.needsVerification?'The policy does not clearly support a conclusion on this topic.':found.summary,
       clause:found.clause,evidence:found.clause>=0?policy.clauses[found.clause]:''};
   });

@@ -111,3 +111,16 @@ test('policy review follows up only unresolved topics and keeps unsupported find
   assert.equal(requests[1].clauses.length,1);assert.equal(r.rows.find(x=>x.key==='location').assessment,'unclear');assert.equal(r.risks,0);assert.equal(r.checks,12);
  }finally{globalThis.fetch=originalFetch;}
 });
+
+test('a conditional summary with an unconditional label receives focused verification',async()=>{
+ let calls=0;
+ globalThis.fetch=async(url,init)=>{
+  const input=JSON.parse(JSON.parse(init.body).messages[1].content);calls++;
+  const data={rows:Object.keys(input.questions).map(key=>({key,assessment:key==='location'?(calls===1?'stated':'conditional'):'not_found',summary:key==='location'?'Precise location is shared when you enable that setting.':'Not found.',clause:key==='location'?0:-1,needsVerification:false}))};
+  return Response.json({choices:[{message:{content:JSON.stringify(data)}}],usage:{cost:.001}});
+ };
+ try{
+  const r=await score(env,{id:'test',name:'Example',category:'Tools',url:'https://example.com/privacy',updated:'',clauses:['You can enable precise location.']});
+  assert.equal(calls,2);assert.equal(r.rows.find(x=>x.key==='location').assessment,'conditional');
+ }finally{globalThis.fetch=originalFetch;}
+});
