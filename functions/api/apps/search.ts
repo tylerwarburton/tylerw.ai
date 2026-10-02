@@ -7,7 +7,7 @@ export const onRequestGet = handler(async ({ env, request }) => {
   if (q.length < 2) return fail(400, 'Type at least two letters.');
   await rateLimit(env, `${deviceId(request)}:search`, 60);
   const s = await store(env);
-  const key = `app-search:${q.toLowerCase()}`;
+  const key = `app-search-v2:${q.toLowerCase()}`;
   const cached = JSON.parse((await s.get(key)) ?? 'null');
   if (cached?.expires > Date.now()) return json({ apps: cached.apps });
   const apps = await searchApps(q, env.JINA_API_KEY);

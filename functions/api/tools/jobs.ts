@@ -1,7 +1,5 @@
-// POST /api/tools/jobs  { code }  ->  every O*NET task for the job sorted into
-// Automate / Augment / Own, plus an exposure percentile against all jobs.
+// POST /api/tools/jobs { title, tasks }: classify attendee responsibilities live.
 import {
-  asset,
   assertBudget,
   body,
   deviceId,
@@ -58,46 +56,21 @@ export interface JobResult {
 export const onRequestPost = handler(async (ctx) => {
   const { env, request } = ctx;
   const device = deviceId(request);
-  const { code } = await body<{ code?: string }>(request);
-  if (!code || !/^\d{2}-\d{4}\.\d{2}$/.test(code)) throw new HttpError(400, 'Pick a job.');
-
-  const job = await asset<Job>(ctx, `/demo-data/jobs/tasks/${code}.json`);
-  if (!job?.tasks?.length) throw new HttpError(404, 'We do not have tasks for that job.');
-
-  await rateLimit(env, device);
+  const input = await body<{ title?: string; tasks?: string }>(request, 16000);
+  const title = String(input.title ?? '').trim().slice(0, 120);
+  const lines = String(input.tasks ?? '').split(/\n+/).map(t => t.replace(/^\s*[-*•]\s*/, '').trim()).filter(Boolean);
+  if (!title) throw new HttpError(400, 'Enter your job title.');
+  if (!lines.length) throw new HttpError(400, 'Paste your responsibilities, one task per line.');
+  if (lines.length > 40 || lines.some(t => t.length > 1000)) throw new HttpError(400, 'Use up to 40 tasks, with each task under 1,000 characters.');
+  await rateLimit(env, device, 12);
+  await assertBudget(env);
+  const result = await sortJob(env, { code: 'custom', title, tasks: lines.map((t, i) => ({ id: i + 1, t, core: true })) });
   const s = await store(env);
-  const cacheKey = `jobs:${code}`;
-  // Pre-built before the event (scripts/demo-warm.ts), then the store.
-  let result =
-    (await asset<JobResult>(ctx, `/demo-data/jobs/results/${code}.json`)) ??
-    (JSON.parse((await s.get(cacheKey)) ?? 'null') as JobResult | null);
-  const cached = !!result;
-
-  if (!result) {
-    await assertBudget(env);
-    result = await sortJob(env, job);
-    const baseline = await asset<number[]>(ctx, '/demo-data/jobs/baseline.json');
-    result.percentile = baseline?.length ? percentileOf(baseline, result.exposure) : null;
-    await s.set(cacheKey, JSON.stringify(result));
-  }
-
-  const borderline = result.tasks
-    .filter((t) => t.borderline)
-    .sort((a, b) => a.p - b.p)
-    .slice(0, 3)
-    .map((t) => t.t);
-  ctx.waitUntil(
-    Promise.all([
-      s.addEvent(
-        'jobs',
-        device,
-        { code, title: result.title, split: result.split, exposure: result.exposure, borderline },
-        result.checks,
-      ),
-      s.incr('decisions', result.checks),
-    ]),
-  );
-  return json({ ...result, cached });
+  ctx.waitUntil(Promise.all([
+    s.addEvent('jobs', device, { code: 'custom', title, split: result.split, exposure: result.exposure, borderline: [] }, result.checks),
+    s.incr('decisions', result.checks),
+  ]));
+  return json({ ...result, cached: false });
 });
 
 export async function sortJob(env: Parameters<typeof judgeMany>[0], job: Job): Promise<JobResult> {
@@ -111,7 +84,7 @@ export async function sortJob(env: Parameters<typeof judgeMany>[0], job: Job): P
         env,
         tasks.map((t) => t.t),
         JOB_QUESTIONS,
-        `These are tasks that a ${job.title} performs, from the U.S. Department of Labor O*NET database. Judge each task with today's widely available AI tools in mind.`,
+        `These are tasks that a ${job.title} performs, provided by the person doing the job. Judge each task with today's widely available AI tools in mind.`,
       ).then((r) => r.answers),
     )
   ).flat();

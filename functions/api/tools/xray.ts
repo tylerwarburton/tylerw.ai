@@ -1,13 +1,5 @@
-// POST /api/tools/xray  { app }  ->  12-question scorecard with quoted evidence
-// Every clause of the app's privacy policy is asked all 12 questions. Clauses
-// go out in batches, many batches at once. The app-level answer is the
-// highest-probability clause, and that clause is the evidence.
-//
-// Results are cached per app + policy date: first in a pre-built static file
-// (warmed before the event), then in the store. A cached run still reports
-// the real counts, and the page plays the counter.
+// Every request fetches the selected policy and scores it live. No saved analyses.
 import {
-  asset,
   assertBudget,
   body,
   deviceId,
@@ -83,64 +75,21 @@ export interface Scorecard {
 export const onRequestPost = handler(async (ctx) => {
   const { env, request } = ctx;
   const device = deviceId(request);
-  const { app, store: storeId } = await body<{ app?: string; store?: string }>(request);
-  if (storeId !== undefined) return anyApp(ctx, device, String(storeId));
-  if (!app || !/^[a-z0-9-]{1,40}$/.test(app)) throw new HttpError(400, 'Pick an app.');
-
-  const policy = await asset<Policy>(ctx, `/demo-data/xray/${app}.json`);
-  if (!policy?.clauses?.length) throw new HttpError(404, 'We do not have that policy loaded.');
-
-  await rateLimit(env, device);
+  const { store: storeId } = await body<{ store?: string }>(request);
+  const id = String(storeId ?? '');
+  if (!/^\d{5,12}$/.test(id)) throw new HttpError(400, 'Search for an app and select it from the App Store results.');
+  await rateLimit(env, `${device}:live-xray`, 6);
+  await assertBudget(env);
+  const { url, name } = await policyUrlFor(id);
+  const { clauses, updated } = await fetchPolicy(url, env.JINA_API_KEY);
+  const card = await score(env, { id: `as-${id}`, name: name || 'This app', category: 'App Store', url, updated, clauses });
   const s = await store(env);
-  const cacheKey = `xray:${app}:${policy.updated}`;
-
-  let card =
-    (await asset<Scorecard>(ctx, `/demo-data/xray/results/${app}.json`).then((c) =>
-      c && c.updated === policy.updated ? c : null,
-    )) ?? (JSON.parse((await s.get(cacheKey)) ?? 'null') as Scorecard | null);
-  const cached = !!card;
-
-  if (!card) {
-    await assertBudget(env);
-    card = await score(env, policy);
-    await s.set(cacheKey, JSON.stringify(card));
-  }
-
-  ctx.waitUntil(
-    Promise.all([
-      s.addEvent('xray', device, { app, name: policy.name, risks: card.risks, riskTotal: card.riskTotal }, card.checks),
-      s.incr('decisions', card.checks),
-    ]),
-  );
-  return json({ ...card, cached });
+  ctx.waitUntil(Promise.all([
+    s.addEvent('xray', device, { app: `as-${id}`, name: card.name, risks: card.risks, riskTotal: card.riskTotal }, card.checks),
+    s.incr('decisions', card.checks),
+  ]));
+  return json({ ...card, cached: false });
 });
-
-/** Any App Store app: find its policy link, read the policy, score it live. */
-async function anyApp(ctx: Parameters<Parameters<typeof handler>[0]>[0], device: string, id: string) {
-  const { env } = ctx;
-  if (!/^\d{5,12}$/.test(id)) throw new HttpError(400, 'Pick an app from the search results.');
-  await rateLimit(env, device);
-  const s = await store(env);
-  const cacheKey = `xray:as:${id}`;
-  let card = JSON.parse((await s.get(cacheKey)) ?? 'null') as Scorecard | null;
-  const cached = !!card;
-  if (!card) {
-    await rateLimit(env, `${device}:live-xray`, 6);
-    await assertBudget(env);
-    const { url, name } = await policyUrlFor(id);
-    const { clauses, updated } = await fetchPolicy(url, env.JINA_API_KEY);
-    card = await score(env, { id: `as-${id}`, name: name || 'This app', category: 'App Store', url, updated, clauses });
-    await s.set(cacheKey, JSON.stringify(card));
-  }
-  const done = card;
-  ctx.waitUntil(
-    Promise.all([
-      s.addEvent('xray', device, { app: `as-${id}`, name: done.name, risks: done.risks, riskTotal: done.riskTotal }, done.checks),
-      s.incr('decisions', done.checks),
-    ]),
-  );
-  return json({ ...done, cached });
-}
 
 export async function score(env: Parameters<typeof judgeMany>[0], policy: Policy): Promise<Scorecard> {
   const started = Date.now();

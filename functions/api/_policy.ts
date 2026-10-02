@@ -14,11 +14,12 @@ export interface StoreApp {
   name: string;
   seller: string;
   genre: string;
+  icon?: string;
 }
 
 /** App Store search (iTunes Search API): any app, no key needed. */
 export async function searchApps(q: string, readerKey?: string): Promise<StoreApp[]> {
-  const url = `https://itunes.apple.com/search?entity=software&country=us&limit=8&term=${encodeURIComponent(q)}`;
+  const url = `https://itunes.apple.com/search?entity=software&country=us&limit=24&term=${encodeURIComponent(q)}`;
   // Apple can reject datacenter egress. Keep the direct request plain, then
   // use the public reader as a separate egress path. Never forward demo keys.
   for (const reader of [false, true]) {
@@ -35,18 +36,66 @@ export async function searchApps(q: string, readerKey?: string): Promise<StoreAp
       }
       const raw = (await res.text()).slice(0, MAX_BYTES);
       const content = reader ? raw.split(/\nMarkdown Content:\s*\n/).pop()! : raw;
-      const d = JSON.parse(content.slice(content.indexOf('{'), content.lastIndexOf('}') + 1)) as { results?: { trackId: number; trackName: string; sellerName?: string; primaryGenreName?: string }[] };
+      const d = JSON.parse(content.slice(content.indexOf('{'), content.lastIndexOf('}') + 1)) as { results?: { trackId: number; trackName: string; sellerName?: string; primaryGenreName?: string; artworkUrl100?: string; artworkUrl512?: string }[] };
       if (!Array.isArray(d.results)) throw new Error('Invalid search response');
       return d.results.filter((r) => /^\d{5,12}$/.test(String(r.trackId)) && typeof r.trackName === 'string')
-        .slice(0, 8).map((r) => ({
+        .slice(0, 24).map((r) => ({
           id: String(r.trackId), name: r.trackName,
           seller: String(r.sellerName ?? ''), genre: String(r.primaryGenreName ?? ''),
+          ...(appleIcon(r.artworkUrl512 || r.artworkUrl100) ? { icon: appleIcon(r.artworkUrl512 || r.artworkUrl100) } : {}),
         }));
     } catch {
       console.warn('App search upstream unavailable', reader ? 'reader' : 'apple');
     }
   }
-  throw new HttpError(503, 'App Store search is temporarily unavailable. You can still choose a ready-to-view app below, or try your search again.');
+  // The store's rendered search page remains usable when the legacy search
+  // API or reader is unavailable. Extract only first-party app result links.
+  try {
+    const res = await fetch(`https://apps.apple.com/us/iphone/search?term=${encodeURIComponent(q)}`, {
+      headers: { accept: 'text/html', 'accept-language': 'en-US' },
+      signal: AbortSignal.timeout(8000),
+    });
+    if (res.ok) {
+      const apps = parseStoreSearch((await res.text()).slice(0, MAX_BYTES));
+      if (apps.length) return apps;
+    }
+  } catch {
+    console.warn('App search page unavailable');
+  }
+  throw new HttpError(503, 'App Store search is temporarily unavailable. Please try your search again.');
+}
+
+export function parseStoreSearch(html: string): StoreApp[] {
+  const apps = new Map<string, StoreApp>();
+  const visit = (value: unknown, depth = 0) => {
+    if (!value || typeof value !== 'object' || depth > 35 || apps.size >= 24) return;
+    const item = value as Record<string, any>;
+    if (item.$kind === 'MixedMediaLockup' && /^\d{5,12}$/.test(String(item.adamId)) && typeof item.title === 'string') {
+      const icon = appleIcon(item.icon?.template?.replace('{w}', '128').replace('{h}', '128').replace('{c}', 'bb').replace('{f}', 'webp'));
+      apps.set(String(item.adamId), { id: String(item.adamId), name: item.title, seller: String(item.developerName ?? ''), genre: '', ...(icon ? { icon } : {}) });
+      return;
+    }
+    for (const child of Object.values(value)) visit(child, depth + 1);
+  };
+  for (const [, content] of html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)) {
+    try { visit(JSON.parse(content)); } catch { /* scripts that are not data */ }
+  }
+  for (const [tag] of html.matchAll(/<a\b[^>]*>/gi)) {
+    const href = tag.match(/\bhref="([^"]+)"/i)?.[1] ?? '';
+    const id = href.match(/^https:\/\/apps\.apple\.com\/us\/app\/[^"?#]*?\bid(\d{5,12})(?:[?#]|$)/)?.[1];
+    const name = decode(tag.match(/\baria-label="([^"]+)"/i)?.[1] ?? '').trim();
+    if (id && name && !apps.has(id)) apps.set(id, { id, name, seller: '', genre: '' });
+    if (apps.size >= 24) break;
+  }
+  return [...apps.values()];
+}
+
+function appleIcon(value: unknown): string | undefined {
+  if (typeof value !== 'string') return;
+  try {
+    const url = new URL(value);
+    if (url.protocol === 'https:' && url.hostname.endsWith('.mzstatic.com')) return url.toString();
+  } catch { /* missing artwork */ }
 }
 
 /** App Store page -> the developer's privacy policy URL. */

@@ -1,0 +1,8 @@
+---
+import DemoExperience from '../../components/DemoExperience.astro';
+export function getStaticPaths() {
+  return ['scam', 'xray', 'jobs', 'custom'].map(tool => ({ params: { tool } }));
+}
+const { tool } = Astro.params;
+---
+<DemoExperience tool={tool} />

@@ -59,3 +59,8 @@ test('direct Worker secrets work without accessing account store', async () => {
   const env = { OPENROUTER_API_KEY: 'local-test', OPENROUTER_SECRET: { get: async () => { throw Error('should not read'); } } };
   assert.equal((await resolveSecrets(env, 'POST', '/api/tools/scam')).OPENROUTER_API_KEY, 'local-test');
 });
+const { parseStoreSearch } = await import(pathToFileURL(join(dir, 'policy.mjs')));
+test('rendered store fallback uses labeled app links and removes duplicates', () => {
+ const html = '<a aria-label="A &amp; B" href="https://apps.apple.com/us/app/a/id12345678">App</a><a href="https://apps.apple.com/us/app/a/id12345678" aria-label="Duplicate">App</a><a aria-label="Other" href="https://example.com/id87654321">Other</a>';
+ assert.deepEqual(parseStoreSearch(html), [{id:'12345678',name:'A & B',seller:'',genre:''}]);
+});
