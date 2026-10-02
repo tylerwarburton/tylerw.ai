@@ -60,3 +60,37 @@ test('failed parallel checks settle in-flight usage and stop new work',async()=>
  assert.deepEqual(started,[0,1]);assert.equal(finished,false);
  release();await assert.rejects(run,/failed check/);assert.equal(finished,true);
 });
+test('title-only profiles get labeled suggestions and unrelated copied UI is removed before inference',async()=>{
+ let calls=0;
+ globalThis.fetch=async(url,init)=>{
+  const body=JSON.parse(init.body);
+  assert.doesNotMatch(body.messages[1].content,/PRIVATE_CHAT_SENTINEL|UNRELATED_ROLE_SENTINEL/);
+  const data=++calls===1?{title:'Senior Account Director',tasks:[]}:{tasks:['Manage client relationships','Plan account strategy','Coordinate project delivery','Review account performance','Coach account teams']};
+  return Response.json({choices:[{message:{content:JSON.stringify(data)}}],usage:{cost:.001}});
+ };
+ try {
+  const profile='Profile Name\nSenior Account Director\nPeople similar to Profile Name\nUNRELATED_ROLE_SENTINEL\nHighlights\nExperience\nSenior Account Director\nJan 2024 - Present\nAccount Director\n2023\nMore profiles for you\nPRIVATE_CHAT_SENTINEL';
+  const res=await worker.fetch(new Request('https://example.com/api/tools/jobs',{method:'POST',headers:{'content-type':'application/json','x-device-id':'profile-test-123'},body:JSON.stringify({action:'extract',profile})}),env,ctx);
+  const data=await res.json();assert.equal(res.status,200);assert.equal(data.source,'suggested');assert.equal(data.tasks.length,5);assert.equal(calls,2);
+ }finally{globalThis.fetch=originalFetch;}
+});
+await build({entryPoints:['functions/api/tools/xray.ts'],bundle:true,platform:'node',format:'esm',outfile:join(dir,'xray.mjs')});
+const {score,XRAY_QUESTIONS}=await import(pathToFileURL(join(dir,'xray.mjs')));
+test('policy context distinguishes consent, explicit denial, and missing evidence',async()=>{
+ globalThis.fetch=async(url,init)=>{
+  const b=JSON.parse(init.body), schema=b.response_format.json_schema.schema;
+  let data;
+  if(schema.properties.rows){
+   data={rows:Object.keys(XRAY_QUESTIONS).map(key=>({key,assessment:key==='location'?'conditional':key==='sells'?'denied':'not_found',summary:key==='location'?'Precise location is collected only if enabled.':key==='sells'?'The policy denies selling personal data.':'Not found in the supplied text.',clause:key==='location'?0:key==='sells'?1:-1}))};
+  }else{
+   const n=Number(b.messages[1].content.match(/\((\d+) items,/)[1]);
+   const keys=Object.keys(schema.properties.items.items.properties).filter(k=>k!=='i');
+   data={items:Array.from({length:n},(_,i)=>Object.fromEntries([['i',i],...keys.map(k=>[k,90])]))};
+  }
+  return Response.json({choices:[{message:{content:JSON.stringify(data)}}],usage:{cost:.001}});
+ };
+ try{
+  const r=await score(env,{id:'test',name:'Example',category:'Tools',url:'https://example.com/privacy',updated:'',clauses:['We collect precise location only when you enable it.','We do not sell personal data.']});
+  assert.equal(r.rows.find(x=>x.key==='location').assessment,'conditional');assert.equal(r.rows.find(x=>x.key==='sells').assessment,'denied');assert.equal(r.rows.find(x=>x.key==='health').evidence,'');assert.equal(r.risks,0);
+ }finally{globalThis.fetch=originalFetch;}
+});

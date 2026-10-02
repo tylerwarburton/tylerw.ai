@@ -143,6 +143,7 @@ const titles: Record<string, string> = { scam: 'Scam Check', xray: 'App Privacy 
           </section>
           <section class="jr-input-card" id="jobReview" hidden aria-labelledby="jobReviewTitle">
             <div class="jr-card-heading"><div class="jr-symbol" aria-hidden="true">✓</div><div><h3 id="jobReviewTitle" tabindex="-1">Review your tasks</h3><p>Edit or remove anything that is wrong.</p></div></div>
+            <p id="jobTaskSource" class="job-source-note" hidden></p>
             <label class="lbl" for="jobSearch">Your job title</label>
             <input class="search" id="jobSearch" type="text" maxlength="120" placeholder="Your role" autocomplete="off" />
             <div class="jr-label-row"><label class="lbl" for="jobTasks">Your responsibilities</label><span id="jobTaskCount">0 tasks</span></div>
@@ -1345,4 +1346,5 @@ const titles: Record<string, string> = { scam: 'Scam Check', xray: 'App Privacy 
     .email-summary-verdict { font-size:18px; } .email-summary-score { font-size:28px; }
     .email-expanded { padding:0 16px 16px; }
   }
+.job-source-note { padding:12px 14px; border-left:3px solid var(--d-unsure); background:var(--d-panel-2); color:var(--d-text); font-size:14px; line-height:1.5; }
 </style>
