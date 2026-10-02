@@ -64,3 +64,23 @@ test('rendered store fallback uses labeled app links and removes duplicates', ()
  const html = '<a aria-label="A &amp; B" href="https://apps.apple.com/us/app/a/id12345678">App</a><a href="https://apps.apple.com/us/app/a/id12345678" aria-label="Duplicate">App</a><a aria-label="Other" href="https://example.com/id87654321">Other</a>';
  assert.deepEqual(parseStoreSearch(html), [{id:'12345678',name:'A & B',seller:'',genre:''}]);
 });
+const {policyUrlFor,parsePolicyLink}=await import(pathToFileURL(join(dir,'policy.mjs')));
+test('app page failures fall back to reader without forwarding its key to Apple',async()=>{
+ let calls=0;
+ globalThis.fetch=async(url,init)=>{
+  calls++;
+  if(calls===1){assert.equal(init.headers.authorization,undefined);return new Response('Unavailable',{status:503});}
+  assert.equal(init.headers.authorization,'Bearer reader-test');
+  return new Response("Title: Example – App Store\n\nMarkdown Content:\n[Developer’s Privacy Policy](https://example.com/privacy)");
+ };
+ try {assert.deepEqual(await policyUrlFor('12345678','reader-test'),{name:'Example',url:'https://example.com/privacy'});assert.equal(calls,2);}
+ finally{globalThis.fetch=originalFetch;}
+});
+test('store outage is retryable rather than reporting that the app does not exist',async()=>{
+ globalThis.fetch=async()=>new Response('Unavailable',{status:503});
+ try{await assert.rejects(policyUrlFor('12345678'),e=>e.status===503);}finally{globalThis.fetch=originalFetch;}
+});
+test('privacy parser retains developer link and ignores Apple footer privacy',()=>{
+ assert.equal(parsePolicyLink('[Privacy Policy](https://www.apple.com/legal/privacy/)'),null);
+ assert.equal(parsePolicyLink('<a href="https://example.com/privacy?a=1&amp;b=2" aria-label="Developer\'s Privacy Policy">policy</a>').url,'https://example.com/privacy?a=1&b=2');
+});
