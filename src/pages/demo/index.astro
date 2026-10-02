@@ -166,7 +166,7 @@ export OPENAI_API_KEY=tmx_your_token_here</code></pre>
 
           <div class="step">
             <h3><span class="n mono">3</span> Starter prompt</h3>
-            <p class="muted">Paste into any chat assistant. It will help you design a fast classifier for a task from your own work.</p>
+            <p class="muted">Get your token above, then copy this prompt into your coding assistant. Add what you want to build at the end.</p>
             <pre class="code prompt" data-copy><code id="starterPrompt" data-tokenize>I just saw a "System 1" demo: small, fast AI models used as judgment engines, not chatbots. Instead of writing paragraphs, they answer structured questions with probabilities in well under a second, so you can run thousands of checks cheaply.
 
 There are three question types:
@@ -179,10 +179,13 @@ I have an OpenAI-compatible endpoint for tonight:
   API key:  tmx_your_token_here
   model:    MODEL_ID
 
-Help me build one of these for a real task from my job in security, audit or risk. First ask me what I do and which repetitive judgment I'd most like to speed up. Then:
-1. Write 5-10 precise questions for it (mix of the three types).
-2. Give me a short Python script that sends one item plus those questions and asks for JSON with probabilities.
-3. Show me how to run it over a CSV of items, and how to check it against 20 examples I label myself before trusting it.</code></pre>
+Build a small, working prototype for the task I describe below. Use the endpoint, demo token and model above for the app's AI calls via POST /chat/completions. Use my coding assistant's normal subscription to write the code; do not reconfigure the assistant itself to use this endpoint.
+
+Keep the interface simple: input, a clear Run button, structured results, loading feedback and readable errors. Choose precise yes/no, category or score questions and request JSON probabilities. Put the demo token in a local environment file excluded from git; do not commit it. The token expires at midnight Eastern and has a 2,000-call cap.
+
+Give me the complete files, install/run commands and a small example I can try immediately. Include a way to compare results with examples I label myself. If your environment cannot execute external API calls, create runnable code and explain how I can run it locally; do not invent API results.
+
+Type what you want this to do:</code></pre>
             <div class="row-btns">
               <a class="btn-d" id="starterClaude" target="_blank" rel="noopener" href="https://claude.ai/new">Open in Claude</a>
               <a class="btn-d" id="starterGpt" target="_blank" rel="noopener" href="https://chatgpt.com/">Open in ChatGPT</a>
@@ -233,7 +236,7 @@ Help me build one of these for a real task from my job in security, audit or ris
 
         <!-- App Privacy X-ray -->
         <div class="tool" data-tool="xray" hidden>
-          <input class="search" id="appSearch" type="search" placeholder="Search apps" autocomplete="off" />
+          <input class="search" id="appSearch" type="search" placeholder="Search any iPhone app" aria-label="Search apps by name" autocomplete="off" />
           <div id="appPicker" class="app-picker"></div>
           <div class="result" id="xrayOut" aria-live="polite"></div>
         </div>

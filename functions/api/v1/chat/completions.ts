@@ -17,6 +17,7 @@ export function allowedModels(env: Env) {
 
 export const onRequestPost = handler(async (ctx) => {
   const { env, request } = ctx;
+  if (!env.OPENROUTER_API_KEY) return fail(501, 'Live AI is not switched on yet. Please ask the presenter to enable it.');
   const auth = request.headers.get('authorization') || '';
   const token = auth.replace(/^Bearer\s+/i, '').trim();
   if (!token.startsWith('tmx_')) return fail(401, 'Use your demo token from tylerw.ai/demo as the API key.');

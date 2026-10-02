@@ -17,19 +17,36 @@ export interface StoreApp {
 }
 
 /** App Store search (iTunes Search API): any app, no key needed. */
-export async function searchApps(q: string): Promise<StoreApp[]> {
+export async function searchApps(q: string, readerKey?: string): Promise<StoreApp[]> {
   const url = `https://itunes.apple.com/search?entity=software&country=us&limit=8&term=${encodeURIComponent(q)}`;
-  const res = await fetch(url, { headers: { 'user-agent': UA }, cf: { cacheTtl: 3600, cacheEverything: true } } as RequestInit);
-  if (!res.ok) throw new HttpError(503, 'App Store search is busy. Try again in a moment.');
-  const d = (await res.json()) as {
-    results?: { trackId: number; trackName: string; sellerName: string; primaryGenreName: string }[];
-  };
-  return (d.results ?? []).map((r) => ({
-    id: String(r.trackId),
-    name: r.trackName,
-    seller: r.sellerName,
-    genre: r.primaryGenreName,
-  }));
+  // Apple can reject datacenter egress. Keep the direct request plain, then
+  // use the public reader as a separate egress path. Never forward demo keys.
+  for (const reader of [false, true]) {
+    try {
+      const res = await fetch(reader ? `https://r.jina.ai/${url}` : url, {
+        headers: reader
+          ? { accept: 'text/plain', ...(readerKey ? { authorization: `Bearer ${readerKey}` } : {}) }
+          : { accept: 'application/json' },
+        signal: AbortSignal.timeout(reader ? 12000 : 5000),
+      });
+      if (!res.ok) {
+        console.warn('App search upstream failed', reader ? 'reader' : 'apple', res.status);
+        continue;
+      }
+      const raw = (await res.text()).slice(0, MAX_BYTES);
+      const content = reader ? raw.split(/\nMarkdown Content:\s*\n/).pop()! : raw;
+      const d = JSON.parse(content.slice(content.indexOf('{'), content.lastIndexOf('}') + 1)) as { results?: { trackId: number; trackName: string; sellerName?: string; primaryGenreName?: string }[] };
+      if (!Array.isArray(d.results)) throw new Error('Invalid search response');
+      return d.results.filter((r) => /^\d{5,12}$/.test(String(r.trackId)) && typeof r.trackName === 'string')
+        .slice(0, 8).map((r) => ({
+          id: String(r.trackId), name: r.trackName,
+          seller: String(r.sellerName ?? ''), genre: String(r.primaryGenreName ?? ''),
+        }));
+    } catch {
+      console.warn('App search upstream unavailable', reader ? 'reader' : 'apple');
+    }
+  }
+  throw new HttpError(503, 'App Store search is temporarily unavailable. You can still choose a ready-to-view app below, or try your search again.');
 }
 
 /** App Store page -> the developer's privacy policy URL. */
@@ -37,6 +54,7 @@ export async function policyUrlFor(appId: string): Promise<{ url: string; name: 
   const res = await fetch(`https://apps.apple.com/us/app/id${appId}`, {
     headers: { 'user-agent': UA, 'accept-language': 'en-US' },
     redirect: 'follow',
+    signal: AbortSignal.timeout(10000),
   });
   if (!res.ok) throw new HttpError(404, 'Could not open that app on the App Store.');
   const html = await res.text();
