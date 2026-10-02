@@ -270,7 +270,7 @@ interface Card {
   checks: number;
   ms: number;
   cached: boolean;
-  rows: { key: string; good: boolean; p: number; clause: number; evidence: string; assessment?:string; summary?:string }[];
+  rows: { key: string; good: boolean; clause: number; evidence: string; assessment?:string; summary?:string }[];
   risks: number;
   riskTotal: number;
 }
@@ -400,7 +400,7 @@ function renderXray(out: HTMLElement, r: Card, ms: number | null, icon?:string) 
     <div class="panel-d">
       <div class="x-head">${appIcon(icon,r.name)}
         <div><h3>${esc(r.name)}</h3><p>Policy ${esc(r.updated || 'date not stated')} · <a href="${esc(r.url)}" target="_blank" rel="noopener">source</a></p></div></div>
-      <p class="speed" style="margin:12px 0 0"><b>${fmt(r.clauses)} clauses × 12 questions = ${fmt(r.checks)} checks</b> ${ms == null ? '' : `· live in ${secs(ms)}`}</p>
+      <p class="speed" style="margin:12px 0 0"><b>${fmt(r.checks)} privacy questions · ${fmt(r.clauses)} passages reviewed</b> ${ms == null ? '' : `· live in ${secs(ms)}`}</p>
     </div>
     <div class="scan-columns">${columns}</div>
     `;

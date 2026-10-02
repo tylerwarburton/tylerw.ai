@@ -76,12 +76,14 @@ test('title-only profiles get labeled suggestions and unrelated copied UI is rem
 });
 await build({entryPoints:['functions/api/tools/xray.ts'],bundle:true,platform:'node',format:'esm',outfile:join(dir,'xray.mjs')});
 const {score,XRAY_QUESTIONS}=await import(pathToFileURL(join(dir,'xray.mjs')));
-test('policy context distinguishes consent, explicit denial, and missing evidence',async()=>{
+test('policy context uses one call for supported findings and counts questions',async()=>{
+ let calls=0;
  globalThis.fetch=async(url,init)=>{
+  calls++;
   const b=JSON.parse(init.body), schema=b.response_format.json_schema.schema;
   let data;
   if(schema.properties.rows){
-   data={rows:Object.keys(XRAY_QUESTIONS).map(key=>({key,assessment:key==='location'?'conditional':key==='sells'?'denied':'not_found',summary:key==='location'?'Precise location is collected only if enabled.':key==='sells'?'The policy denies selling personal data.':'Not found in the supplied text.',clause:key==='location'?0:key==='sells'?1:-1}))};
+   data={rows:Object.keys(XRAY_QUESTIONS).map(key=>({key,assessment:key==='location'?'conditional':key==='sells'?'denied':'not_found',summary:key==='location'?'Precise location is collected only if enabled.':key==='sells'?'The policy denies selling personal data.':'Not found in the supplied text.',clause:key==='location'?0:key==='sells'?1:-1,needsVerification:false}))};
   }else{
    const n=Number(b.messages[1].content.match(/\((\d+) items,/)[1]);
    const keys=Object.keys(schema.properties.items.items.properties).filter(k=>k!=='i');
@@ -91,6 +93,21 @@ test('policy context distinguishes consent, explicit denial, and missing evidenc
  };
  try{
   const r=await score(env,{id:'test',name:'Example',category:'Tools',url:'https://example.com/privacy',updated:'',clauses:['We collect precise location only when you enable it.','We do not sell personal data.']});
-  assert.equal(r.rows.find(x=>x.key==='location').assessment,'conditional');assert.equal(r.rows.find(x=>x.key==='sells').assessment,'denied');assert.equal(r.rows.find(x=>x.key==='health').evidence,'');assert.equal(r.risks,0);
+  assert.equal(r.rows.find(x=>x.key==='location').assessment,'conditional');assert.equal(r.rows.find(x=>x.key==='sells').assessment,'denied');assert.equal(r.rows.find(x=>x.key==='health').evidence,'');assert.equal(r.risks,0);assert.equal(calls,1);assert.equal(r.checks,12);
+ }finally{globalThis.fetch=originalFetch;}
+});
+
+test('policy review follows up only unresolved topics and keeps unsupported findings unclear',async()=>{
+ const requests=[];
+ globalThis.fetch=async(url,init)=>{
+  const b=JSON.parse(init.body), input=JSON.parse(b.messages[1].content);
+  requests.push(input);
+  const data={rows:Object.keys(input.questions).map(key=>({key,assessment:key==='location'?'stated':'not_found',summary:'Example finding.',clause:key==='location'?0:-1,needsVerification:key==='location'}))};
+  return Response.json({choices:[{message:{content:JSON.stringify(data)}}],usage:{cost:.001}});
+ };
+ try{
+  const r=await score(env,{id:'test',name:'Example',category:'Tools',url:'https://example.com/privacy',updated:'',clauses:['Location information may be processed.']});
+  assert.equal(requests.length,2);assert.deepEqual(Object.keys(requests[1].questions),['location']);
+  assert.equal(requests[1].clauses.length,1);assert.equal(r.rows.find(x=>x.key==='location').assessment,'unclear');assert.equal(r.risks,0);assert.equal(r.checks,12);
  }finally{globalThis.fetch=originalFetch;}
 });
