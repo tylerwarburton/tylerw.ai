@@ -7,6 +7,8 @@
 
 export interface Env {
   OPENROUTER_API_KEY: string;
+  OPENROUTER_SECRET?: { get(): Promise<string> };
+  DEMO_ADMIN_SECRET?: { get(): Promise<string> };
   /** Primary fast model. Defaults to DEFAULT_MODEL. */
   DEMO_MODEL?: string;
   /** Optional separate OpenRouter key handed to attendees in the Build panel. */

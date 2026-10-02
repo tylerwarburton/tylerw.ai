@@ -13,6 +13,7 @@ import * as wall from '../functions/api/wall';
 import * as chat from '../functions/api/v1/chat/completions';
 import * as models from '../functions/api/v1/models';
 import * as appSearch from '../functions/api/apps/search';
+import { resolveSecrets } from './secrets';
 
 type Handler = (ctx: never) => Promise<Response>;
 const routes: Record<string, Handler | undefined> = {
@@ -39,6 +40,15 @@ export default {
       return new Response(JSON.stringify({ error: 'Not found' }), {
         status: 404,
         headers: { 'content-type': 'application/json' },
+      });
+    }
+    // Account Secrets Store bindings are asynchronous resources, not strings.
+    // Resolve into a request-local env; never mutate shared bindings or log keys.
+    try {
+      env = await resolveSecrets(env, request.method, url.pathname);
+    } catch {
+      return new Response(JSON.stringify({ error: 'Live AI configuration is temporarily unavailable. Please ask the presenter to check the Worker secret bindings.' }), {
+        status: 503, headers: { 'content-type': 'application/json', 'cache-control': 'no-store', ...cors() },
       });
     }
     const res = await route({

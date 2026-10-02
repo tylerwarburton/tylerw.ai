@@ -42,3 +42,20 @@ test('valid empty search does not invoke fallback', async () => {
   try { assert.deepEqual(await searchApps('nothing'), []); assert.equal(calls, 1); }
   finally { globalThis.fetch = originalFetch; }
 });
+await build({ entryPoints: ['worker/secrets.ts'], bundle: true, platform: 'node', format: 'esm', outfile: join(dir, 'secrets.mjs') });
+const { resolveSecrets } = await import(pathToFileURL(join(dir, 'secrets.mjs')));
+test('account secrets resolve per route without mutating env', async () => {
+  let ai = 0, admin = 0;
+  const env = { OPENROUTER_SECRET: { get: async () => { ++ai; return 'test-ai-value'; } }, DEMO_ADMIN_SECRET: { get: async () => { ++admin; return 'test-admin-value'; } } };
+  const resolved = await resolveSecrets(env, 'POST', '/api/tools/scam');
+  assert.equal(resolved.OPENROUTER_API_KEY, 'test-ai-value');
+  assert.equal(env.OPENROUTER_API_KEY, undefined);
+  assert.equal(admin, 0);
+  assert.equal((await resolveSecrets(env, 'POST', '/api/wall/')).DEMO_ADMIN_KEY, 'test-admin-value');
+  await resolveSecrets(env, 'GET', '/api/wall');
+  assert.equal(ai, 1); assert.equal(admin, 1);
+});
+test('direct Worker secrets work without accessing account store', async () => {
+  const env = { OPENROUTER_API_KEY: 'local-test', OPENROUTER_SECRET: { get: async () => { throw Error('should not read'); } } };
+  assert.equal((await resolveSecrets(env, 'POST', '/api/tools/scam')).OPENROUTER_API_KEY, 'local-test');
+});
