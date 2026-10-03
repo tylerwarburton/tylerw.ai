@@ -2,7 +2,7 @@
 // privacy-policy link from its App Store page, and split the policy into
 // clauses. Runs inside the Worker; everything fetched is public.
 
-import { HttpError } from './_lib';
+import { HttpError, store, type Env } from './_lib';
 
 const UA =
   'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15';
@@ -121,7 +121,7 @@ export function parsePolicyLink(raw: string): {url:string;name:string} | null {
 export async function policyUrlFor(appId: string, readerKey?:string): Promise<{ url: string; name: string }> {
   const url=`https://apps.apple.com/us/app/id${appId}`;
   let readable=false;
-  for (const reader of [false,true]) {
+  for (const reader of [false,true,false]) {
     try {
       const res=await fetch(reader ? `https://r.jina.ai/${url}` : url, {
         headers:reader ? {accept:'text/plain',...(readerKey ? {authorization:`Bearer ${readerKey}`} : {})} : {accept:'text/html','accept-language':'en-US'},
@@ -137,6 +137,24 @@ export async function policyUrlFor(appId: string, readerKey?:string): Promise<{ 
   }
   if (readable) throw new HttpError(422,'The App Store page did not expose a readable developer privacy-policy link. Try another app.');
   throw new HttpError(503,'The App Store could not load this app right now. Please retry this app.');
+}
+
+/** Cache only the verified app→policy link, never policy text or decisions. */
+export async function policyMetadata(env:Env,appId:string,waitUntil:(p:Promise<unknown>)=>void):Promise<{url:string;name:string}> {
+  const s=await store(env);
+  const key=`app-policy-link-v1:${appId}`;
+  const cached=JSON.parse(await s.get(key)||'null') as {url:string;name:string;verifiedAt:number}|null;
+  const refresh=async()=>{
+    const meta=await policyUrlFor(appId,env.JINA_API_KEY);
+    await s.set(key,JSON.stringify({...meta,verifiedAt:Date.now()}));
+    return meta;
+  };
+  if(cached && Date.now()-cached.verifiedAt<7*86400000) {
+    // Refresh older metadata without making scans depend on Apple's availability.
+    if(Date.now()-cached.verifiedAt>86400000)waitUntil(refresh().catch(()=>undefined));
+    return {url:cached.url,name:cached.name};
+  }
+  return refresh();
 }
 
 /**

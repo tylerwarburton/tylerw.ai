@@ -11,7 +11,7 @@ Updated October 2, 2026: attendee analyses run live on every request. Precompute
 - `/demo/custom/`: enter text and questions
 - `/demo/wall/`: aggregate activity
 
-App catalog metadata may be cached to reduce upstream search failures. Analysis results are never reused. Policies that block reading return an error rather than a canned result.
+App catalog metadata and verified app-to-policy URLs may be cached to reduce upstream failures. Policy links are reused for up to seven days, with background refresh after one day; a first-time lookup has one bounded recovery attempt. Policy text and decisions are fetched/generated fresh on every scan. Analysis results are never reused. Policies that block reading return an error rather than a canned result.
 
 ## Deployment and secrets
 

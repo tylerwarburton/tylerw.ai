@@ -84,3 +84,20 @@ test('privacy parser retains developer link and ignores Apple footer privacy',()
  assert.equal(parsePolicyLink('[Privacy Policy](https://www.apple.com/legal/privacy/)'),null);
  assert.equal(parsePolicyLink('<a href="https://example.com/privacy?a=1&amp;b=2" aria-label="Developer\'s Privacy Policy">policy</a>').url,'https://example.com/privacy?a=1&b=2');
 });
+
+const {policyMetadata}=await import(pathToFileURL(join(dir,'policy.mjs')));
+test('verified policy URL is reused during store outages without caching policy content',async()=>{
+ let calls=0;
+ globalThis.fetch=async()=>{calls++;return new Response('<meta property="og:title" content="Example App"><a aria-label="Developer’s Privacy Policy" href="https://example.com/privacy">Policy</a>');};
+ try{
+  const first=await policyMetadata({},'metadata-test-1',()=>{});assert.equal(calls,1);
+  globalThis.fetch=async()=>{calls++;throw Error('Apple unavailable');};
+  assert.deepEqual(await policyMetadata({},'metadata-test-1',()=>{}),first);assert.equal(calls,1);
+  assert.deepEqual(Object.keys(first).sort(),['name','url']);
+ }finally{globalThis.fetch=originalFetch;}
+});
+test('first-time lookup gets one bounded recovery attempt after transient upstream failures',async()=>{
+ let calls=0;
+ globalThis.fetch=async()=>++calls<3?new Response('Unavailable',{status:503}):new Response('<a aria-label="Developer’s Privacy Policy" href="https://example.com/privacy">Policy</a>');
+ try{assert.equal((await policyUrlFor('12345678')).url,'https://example.com/privacy');assert.equal(calls,3);}finally{globalThis.fetch=originalFetch;}
+});

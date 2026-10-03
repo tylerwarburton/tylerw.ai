@@ -13,7 +13,7 @@ import {
   store,
   type Question,
 } from '../_lib';
-import { fetchPolicy, policyUrlFor } from '../_policy';
+import { fetchPolicy, policyMetadata } from '../_policy';
 
 export const XRAY_QUESTIONS: Record<string, Question> = {
   sells: {
@@ -79,7 +79,7 @@ export const onRequestPost = handler(async (ctx) => {
   if (!/^\d{5,12}$/.test(id)) throw new HttpError(400, 'Search for an app and select it from the App Store results.');
   await rateLimit(env, `${device}:live-xray`, 6);
   await assertBudget(env);
-  const { url, name } = await policyUrlFor(id, env.JINA_API_KEY);
+  const { url, name } = await policyMetadata(env,id,p=>ctx.waitUntil(p));
   const { clauses, updated } = await fetchPolicy(url, env.JINA_API_KEY);
   const card = await score(env, { id: `as-${id}`, name: name || 'This app', category: 'App Store', url, updated, clauses });
   const s = await store(env);
