@@ -3,6 +3,7 @@
 // clauses. Runs inside the Worker; everything fetched is public.
 
 import { HttpError, store, type Env } from './_lib';
+import {monidPolicy} from './_monid';
 
 const UA =
   'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15';
@@ -18,11 +19,12 @@ export interface StoreApp {
 }
 
 /** App Store search (iTunes Search API): any app, no key needed. */
-export async function searchApps(q: string, readerKey?: string): Promise<StoreApp[]> {
+export async function searchApps(q: string, readerKey?: string, backup?:()=>Promise<StoreApp[]>): Promise<StoreApp[]> {
   const url = `https://itunes.apple.com/search?entity=software&country=us&limit=24&term=${encodeURIComponent(q)}`;
   // Apple can reject datacenter egress. Keep the direct request plain, then
   // use the public reader as a separate egress path. Never forward demo keys.
   for (const reader of [false, true]) {
+    if(reader&&backup){try{return await backup();}catch{console.warn("App search backup unavailable");}}
     try {
       const res = await fetch(reader ? `https://r.jina.ai/${url}` : url, {
         headers: reader
@@ -118,10 +120,11 @@ export function parsePolicyLink(raw: string): {url:string;name:string} | null {
   } catch {return null;}
 }
 
-export async function policyUrlFor(appId: string, readerKey?:string): Promise<{ url: string; name: string }> {
+export async function policyUrlFor(appId: string, readerKey?:string, backup?:()=>Promise<{url:string;name:string}>): Promise<{ url: string; name: string }> {
   const url=`https://apps.apple.com/us/app/id${appId}`;
   let readable=false;
   for (const reader of [false,true,false]) {
+    if(reader&&backup){try{return await backup();}catch{console.warn("App details backup unavailable");}}
     try {
       const res=await fetch(reader ? `https://r.jina.ai/${url}` : url, {
         headers:reader ? {accept:'text/plain',...(readerKey ? {authorization:`Bearer ${readerKey}`} : {})} : {accept:'text/html','accept-language':'en-US'},
@@ -145,7 +148,7 @@ export async function policyMetadata(env:Env,appId:string,waitUntil:(p:Promise<u
   const key=`app-policy-link-v1:${appId}`;
   const cached=JSON.parse(await s.get(key)||'null') as {url:string;name:string;verifiedAt:number}|null;
   const refresh=async()=>{
-    const meta=await policyUrlFor(appId,env.JINA_API_KEY);
+    const meta=await policyUrlFor(appId,env.JINA_API_KEY,()=>monidPolicy(env,appId));
     await s.set(key,JSON.stringify({...meta,verifiedAt:Date.now()}));
     return meta;
   };

@@ -1,6 +1,7 @@
 // GET /api/apps/search?q=  ->  App Store matches for the any-app X-ray.
 import { deviceId, fail, handler, json, rateLimit, store, HttpError } from '../_lib';
 import { searchApps } from '../_policy';
+import {monidSearch} from '../_monid';
 
 export const onRequestGet = handler(async ({ env, request }) => {
   const q = (new URL(request.url).searchParams.get('q') ?? '').trim().slice(0, 60);
@@ -14,7 +15,7 @@ export const onRequestGet = handler(async ({ env, request }) => {
   const key = `app-search-v2:${q.toLowerCase()}`;
   const cached = JSON.parse((await s.get(key).catch(()=>null)) ?? 'null');
   if (cached?.expires > Date.now()) return json({ apps: cached.apps });
-  const apps = await searchApps(q, env.JINA_API_KEY);
+  const apps = await searchApps(q, env.JINA_API_KEY,()=>monidSearch(env,q,deviceId(request)));
   await s.set(key, JSON.stringify({ apps, expires: Date.now() + 3600_000 })).catch(()=>undefined);
   return json({ apps });
 });

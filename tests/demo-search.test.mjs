@@ -101,3 +101,20 @@ test('first-time lookup gets one bounded recovery attempt after transient upstre
  globalThis.fetch=async()=>++calls<3?new Response('Unavailable',{status:503}):new Response('<a aria-label="Developer’s Privacy Policy" href="https://example.com/privacy">Policy</a>');
  try{assert.equal((await policyUrlFor('12345678')).url,'https://example.com/privacy');assert.equal(calls,3);}finally{globalThis.fetch=originalFetch;}
 });
+await build({entryPoints:['functions/api/_monid.ts'],bundle:true,platform:'node',format:'esm',outfile:join(dir,'monid.mjs')});
+const {monidSearch,monidPolicy}=await import(pathToFileURL(join(dir,'monid.mjs')));
+test('paid backup maps live catalog fields and counts retrieval separately from decisions',async()=>{
+ const env={MONID_SECRET:{get:async()=>'test-provider-key'},RUN_METER:{calls:0,pricedCalls:0,costUsd:0,inputTokens:0,outputTokens:0}};
+ globalThis.fetch=async(url,init)=>{
+  assert.equal(url,'https://api.monid.ai/v1/run');assert.equal(init.headers.authorization,'Bearer test-provider-key');
+  const b=JSON.parse(init.body);assert.equal(b.provider,'litescrape');
+  const output=b.endpoint.endsWith('/search')?{organic_results:[{id:333903271,title:'X',developer:{name:'X Corp.'},logos:[{size:'512x512',link:'https://is1-ssl.mzstatic.com/icon.jpg'}]}]}:{id:'333903271',title:'X',privacy:{privacy_policy_link:'https://x.com/privacy'}};
+  return Response.json({status:'COMPLETED',output,billing:{reportedCost:{currency:'USD',value:150,unit:'MICRO_DOLLAR'}}});
+ };
+ try{assert.equal((await monidSearch(env,'X'))[0].icon,'https://is1-ssl.mzstatic.com/icon.jpg');assert.equal((await monidPolicy(env,'333903271')).url,'https://x.com/privacy');assert.equal(env.RUN_METER.costUsd,.0003);assert.equal(env.RUN_METER.calls,2);assert.equal(env.RUN_METER.pricedCalls,2);}finally{globalThis.fetch=originalFetch;}
+});
+test('Apple denial tries configured backup before the public reader',async()=>{
+ let backup=0;
+ globalThis.fetch=async()=>new Response('Denied',{status:403});
+ try{assert.equal((await searchApps('X',undefined,async()=>{backup++;return [{id:'333903271',name:'X',seller:'X',genre:''}];}))[0].name,'X');assert.equal(backup,1);}finally{globalThis.fetch=originalFetch;}
+});

@@ -47,3 +47,7 @@ References: https://openrouter.ai/docs/guides/community/jev and https://openrout
 Run `npm ci`, `npm run build`, and `node tests/demo-search.test.mjs`. For local use, set secrets in gitignored `.dev.vars`, then run `npx wrangler dev`. Production Secrets Store values are not available locally.
 
 Before the talk, verify each tool with attendee-provided input, check App Store search and icons, use a Build token for a completion, and watch the wall. Open the presenter wall with `?key=<DEMO_ADMIN_KEY>`; R clears test events and F freezes the display. Confirm the provider key has sufficient remaining credit.
+
+### App Store data backup
+
+`MONID_API_KEY` is bound from the account Secrets Store as `MONID_SECRET` (a direct Worker secret also works). If Apple's direct search or app-details fetch fails, the Worker uses Monid's `litescrape` `/app-store/search` or `/app-store/product` endpoint before trying the public reader. Verified catalog price: $0.00015/call. App IDs, names, logos and developer policy links are mapped from provider results; policy analysis remains live. Retrieval charges contribute to room and personal totals. Paid fallback calls require available shared budget storage and have a separate $1 cumulative reservation cap (`monid-reserved-usd`). No provider key is sent to the browser or Apple. Public free search can still run during room storage outages. Temporary provider diagnostics are removed after testing.
