@@ -39,13 +39,15 @@ class ApiError extends Error {
   }
 }
 
-interface RunUsage { costUsd:number; costComplete:boolean; elapsedMs:number; calls:number; inputTokens:number; outputTokens:number }
+interface ModelStage {kind:"decision"|"text";model:string;costUsd:number;costComplete:boolean;elapsedMs:number;inputTokens:number;outputTokens:number;decisions:number;status:"ok"|"failed"}
+interface RunUsage { stages?:ModelStage[]; costUsd:number; costComplete:boolean; elapsedMs:number; calls:number; inputTokens:number; outputTokens:number }
 function updateReceipt(r: {runUsage?:RunUsage}) {
   const u = r.runUsage;
   if (!u) return;
   const header=$('#runReceipt');
   header.hidden=false;
-  header.innerHTML = `<div class="run-receipt"><span>${u.costComplete ? '' : 'Reported portion: '}$${u.costUsd.toFixed(6)} USD${u.costComplete ? '' : ' · cost incomplete'}</span><span>${secs(u.elapsedMs)} total time</span><span>${fmt(u.inputTokens + u.outputTokens)} tokens</span></div>`;
+  const stageSummary=(["decision","text"] as const).map(kind=>{const calls=(u.stages||[]).filter(s=>s.kind===kind);if(!calls.length)return "";const ms=calls.reduce((n,s)=>n+s.elapsedMs,0);const cost=calls.reduce((n,s)=>n+s.costUsd,0);return `<span title="Sum of API call times, including retries. Total time also includes fetching data and network overhead.">${kind==="decision"?"Jev decisions":"LLM text"} · ${ms<1000?`${ms} ms`:secs(ms)} API · $${cost.toFixed(6)}${calls.every(s=>s.costComplete)?"":" reported"}</span>`;}).filter(Boolean).join("");
+  header.innerHTML = `<div class="run-receipt"><span>${u.costComplete ? '' : 'Reported portion: '}$${u.costUsd.toFixed(6)} USD${u.costComplete ? '' : ' · cost incomplete'}</span><span>${secs(u.elapsedMs)} total time</span><span>${fmt(u.inputTokens + u.outputTokens)} tokens</span></div><div class="engine-usage">${stageSummary}</div>`;
 }
 async function api<T>(path: string, payload: unknown, onRetry?: (msg: string) => void): Promise<T & {runUsage:RunUsage}> {
   const started = performance.now();
@@ -56,12 +58,13 @@ async function api<T>(path: string, payload: unknown, onRetry?: (msg: string) =>
     if (data.runUsage) {
       const u = data.runUsage;
       usage.costUsd += u.costUsd; usage.calls += u.calls;
+      (usage.stages??=[]).push(...(u.stages||[]));
       usage.inputTokens += u.inputTokens; usage.outputTokens += u.outputTokens;
       usage.costComplete &&= u.costComplete;
     } else if (!res) usage.costComplete = false;
     usage.elapsedMs = performance.now() - started;
     void pollPersonal();
-    updateReceipt({runUsage:usage});
+    if(data.runUsage) updateReceipt({runUsage:usage});
     if (res?.ok) return {...data,runUsage:usage};
     const status = res?.status ?? 0;
     // A lost response might already have incurred cost: do not repeat it automatically.
@@ -175,7 +178,7 @@ let emailFailureUsage:RunUsage|undefined;
 function renderEmail() {
   const expanded=new Set($$<HTMLDetailsElement>('#scamOut details[open]').map(el=>el.dataset.stage));
   const usages=[...emailResults.map(r=>r.runUsage),emailFailureUsage].filter((u):u is RunUsage=>!!u);
-  const total=usages.reduce((a,u)=>({costUsd:a.costUsd+u.costUsd,elapsedMs:a.elapsedMs+u.elapsedMs,costComplete:a.costComplete&&u.costComplete,calls:a.calls+u.calls,inputTokens:a.inputTokens+u.inputTokens,outputTokens:a.outputTokens+u.outputTokens}),{costUsd:0,elapsedMs:0,costComplete:true,calls:0,inputTokens:0,outputTokens:0});
+  const total=usages.reduce<RunUsage>((a,u)=>({stages:[...(a.stages||[]),...(u.stages||[])],costUsd:a.costUsd+u.costUsd,elapsedMs:a.elapsedMs+u.elapsedMs,costComplete:a.costComplete&&u.costComplete,calls:a.calls+u.calls,inputTokens:a.inputTokens+u.inputTokens,outputTokens:a.outputTokens+u.outputTokens}),{costUsd:0,elapsedMs:0,costComplete:true,calls:0,inputTokens:0,outputTokens:0});
   $('#scamOut').innerHTML = emailStages.map((stage,i) => {
     const r = emailResults[i];
     const blocked = emailResults.some(x => x.stopped);
@@ -403,7 +406,7 @@ function renderXray(out: HTMLElement, r: Card, ms: number | null, icon?:string) 
     <div class="panel-d">
       <div class="x-head">${appIcon(icon,r.name)}
         <div><h3>${esc(r.name)}</h3><p>Policy ${esc(r.updated || 'date not stated')} · <a href="${esc(r.url)}" target="_blank" rel="noopener">source</a></p></div></div>
-      <p class="speed" style="margin:12px 0 0"><b>${fmt(r.checks)} privacy questions · ${fmt(r.clauses)} passages reviewed</b> ${ms == null ? '' : `· live in ${secs(ms)}`}</p>
+      <p class="speed" style="margin:12px 0 0"><b>${fmt(r.rows.length)} privacy questions · ${fmt(r.clauses)} passages reviewed</b> ${ms == null ? '' : `· live in ${secs(ms)}`}</p>
     </div>
     <div class="scan-columns">${columns}</div>
     `;
@@ -438,6 +441,7 @@ function setJobStep(step:string) {
     if(el.dataset.jobStep === step) el.setAttribute('aria-current','step'); else el.removeAttribute('aria-current');
   });
 }
+let jobPreparationUsage:RunUsage|undefined;
 function countJobInputs() {
   $('#jobCharCount').textContent=`${fmt($<HTMLTextAreaElement>('#jobProfile').value.length)} / 40,000`;
   $('#jobTaskCount').textContent=`${$<HTMLTextAreaElement>('#jobTasks').value.split('\n').filter(x=>x.trim()).length} tasks`;
@@ -446,6 +450,7 @@ $('#jobProfile').addEventListener('input',countJobInputs);
 $('#jobTasks').addEventListener('input',countJobInputs);
 $('#jobBackContext').addEventListener('click',()=>setJobStep('context'));
 $('#manualJob').addEventListener('click', () => {
+  jobPreparationUsage=undefined;
   $('#jobTaskSource').hidden=true;
   setJobStep('review');
   reveal($('#jobReview'));
@@ -459,6 +464,7 @@ $('#extractJob').addEventListener('click', async () => {
   const t = ticker(out, 0, 'Reading your work experience', 0);
   try {
     const r = await api<{ title: string; tasks: string[]; source?:string }>('/api/tools/jobs', { action: 'extract', profile }, t.retry);
+    jobPreparationUsage=r.runUsage;
     $('#jobTaskSource').hidden=r.source!=='suggested';
     $('#jobTaskSource').textContent='Your profile lists a role but no duties. These are suggested tasks for that role—edit or remove anything that does not fit.';
     $<HTMLInputElement>('#jobSearch').value = r.title;
@@ -483,6 +489,7 @@ $('#jobsGo').addEventListener('click', async () => {
   try {
     const r = await api<JobRes>('/api/tools/jobs', { title, tasks }, t.retry);
     renderJobs(out, r, performance.now() - started);
+    if(jobPreparationUsage){const a=jobPreparationUsage,b=r.runUsage;updateReceipt({runUsage:{costUsd:a.costUsd+b.costUsd,costComplete:a.costComplete&&b.costComplete,elapsedMs:a.elapsedMs+b.elapsedMs,calls:a.calls+b.calls,inputTokens:a.inputTokens+b.inputTokens,outputTokens:a.outputTokens+b.outputTokens,stages:[...(a.stages||[]),...(b.stages||[])]}});}
     setJobStep('results');
     reveal(out);
   } catch (e) { showError(out, e); }
@@ -497,7 +504,7 @@ function renderJobs(out: HTMLElement, r: JobRes, ms: number | null) {
   <div class="split">${categories.map((b,i)=>{const share=r.tasks.filter(t=>t.bucket===b).length/r.tasks.length;return `<span style="width:${share*100}%;background:${colors[i]}" title="${b}: ${pct(share)}">${share>=.15 ? pct(share) : ''}</span>`;}).join('')}</div>
   <div class="job-columns">${categories.map((b,i)=>{
     const tasks=r.tasks.filter(t=>t.bucket===b).sort((a,b)=>b.p-a.p);
-    return `<section class="job-column" style="--c:${colors[i]}"><h4>${b} · ${tasks.length}</h4><p>${descriptions[i]}</p>${tasks.map(t=>`<div class="task">${esc(t.t)}${t.borderline ? '<span class="tag-b">Worth reviewing</span>' : ''}<div class="conf"><i style="width:${t.p*100}%;background:${colors[i]}"></i></div><small>${pct(t.p)} model confidence</small></div>`).join('') || '<p>No tasks</p>'}</section>`;
+    return `<section class="job-column" style="--c:${colors[i]}"><h4>${b} · ${tasks.length}</h4><p>${descriptions[i]}</p>${tasks.map(t=>`<div class="task">${esc(t.t)}${t.borderline ? '<span class="tag-b">Worth reviewing</span>' : ''}<div class="conf"><i style="width:${t.p*100}%;background:${colors[i]}"></i></div><small>${pct(t.p)} Jev probability</small></div>`).join('') || '<p>No tasks</p>'}</section>`;
   }).join('')}</div>
   <p class="credit">AI estimates about your tasks, not a prediction that your job will disappear.</p><div class="jr-result-actions"><button class="btn-d" id="editJobTasks">Edit tasks</button><button class="btn-d" id="copyJobResults">Copy results</button></div>`;
   $('#editJobTasks',out).addEventListener('click',()=>{setJobStep('review');out.innerHTML='';});
@@ -611,21 +618,24 @@ async function prepareBuild() {
       api<{token:string}>('/api/token',{}),
       getJson<{data:{id:string}[]}>('/api/v1/models'),
     ]);
-    if(!models.data?.[0]?.id) throw new Error('Could not load the demo configuration. Retry.');
-    $('#starterPrompt').textContent=`Build a working app for the task I describe below. Use this OpenAI-compatible API for the app’s live AI checks:
+    if(!models.data?.some(m=>m.id==='typesafe/jev-1.13')) throw new Error('Could not load the demo configuration. Retry.');
+    $('#starterPrompt').textContent=`Build a working app around Jev System One decisions for the task below.
 
-Base URL: https://tylerw.ai/api/v1
 Demo API token: ${r.token}
-Model: ${models.data[0].id}
-Endpoint: POST /chat/completions
+Decision endpoint: POST https://tylerw.ai/api/v1/systemone
 Authorization: Bearer <demo API token>
-Request: {"model":"${models.data[0].id}","messages":[{"role":"user","content":"Your classification question and input"}],"response_format":{"type":"json_object"}}
+Content-Type: application/json
+Model: typesafe/jev-1.13
+Request: {"model":"typesafe/jev-1.13","state":{"message":"Please send the report by 5pm today."},"questions":{"urgent":{"type":"noul","instructions":"Does this require action today?"},"route":{"type":"choice","instructions":"How should this message be handled?","criteria":{"act":"Concrete action requested","read":"Information only","review":"Unclear"}},"priority":{"type":"score","instructions":"How urgent is it?","criteria":["Low","Medium","High"]}}}
+Response: answers.urgent.noul is a probability from 0 to 1; answers.route includes choice, confidence and probabilities; answers.priority includes score (zero-based), confidence and probabilities. usage.cost is actual USD. model identifies the serving release.
 
-Use yes/no probabilities, categories, or 1–5 scores as appropriate. Request structured JSON. Make a simple interface with input, Run, clear results, loading feedback, and errors. All results must come from live API calls.
+Use Jev for every classification, routing decision, score and verification. Batch independent questions about the same state in one request. Branch on its typed probabilities; send uncertainty to user review. Never silently replace Jev with a chat model or invent results. Jev does not generate text.
 
-Use your normal coding capabilities to build the app; do not change your own provider or credentials. Store the demo token in a local environment file excluded from git. This limited demo token expires at midnight Eastern and allows up to 2,000 calls.
+If text extraction or prose is necessary, use a separate explicitly labeled text-generation step, then let Jev decide. Optional text endpoint: POST https://tylerw.ai/api/v1/chat/completions, same demo token; GET https://tylerw.ai/api/v1/models lists text models. That endpoint takes messages and is not the decision endpoint.
 
-Provide the files and commands to run it. If you cannot call the API yourself, give me runnable code; never invent results.
+Build a simple mobile-friendly input, Run, results and loading interface. Show actual Jev cost and elapsed API time separately from text-model work and total workflow time. Keep all provider calls server-side. Store this limited demo token in a gitignored environment file. It expires at midnight Eastern and allows up to 2,000 calls across endpoints. Do not change your own coding assistant provider or credentials.
+
+Provide files and commands to run it. If you cannot call the API yourself, give runnable code and say it is untested.
 
 Type what you want this to do:`;
     buildReady=true;
@@ -641,14 +651,14 @@ $('#copyBuild').addEventListener('click',()=>void copy($('#starterPrompt').textC
 
 // — Room pulse (header stat + "recent apps") ——————————————————
 interface Room {
-  totals: { decisions: number; people: number; spent:number };
+  totals: { jevDecisions?:number; jevSpend?:number; textSpend?:number; decisions: number; people: number; spent:number };
   xray: { recent: string[] };
 }
 let room: Room | null = null;
 async function pollRoom() {
   try {
     room = await getJson<Room>('/api/wall');
-    $('#roomStat').textContent = `${fmt(room.totals.decisions)} decisions · ${fmt(room.totals.people)} people · $${room.totals.spent.toFixed(4)} USD spent`;
+    $('#roomStat').textContent = `${fmt(room.totals.decisions)} total decisions · ${fmt(room.totals.jevDecisions||0)} Jev · ${fmt(room.totals.people)} people · $${room.totals.spent.toFixed(4)} USD spent`;
   } catch {
     /* offline or not deployed: stay quiet */
   }
@@ -658,7 +668,7 @@ async function pollPersonal() {
     const res=await fetch('/api/usage',{headers:{'x-device-id':deviceId()}});
     if (!res.ok) return;
     const u=await res.json();
-    $('#personalStat').textContent=`${fmt(u.decisions)} decisions · ${fmt(u.runs)} tool calls · $${u.costUsd.toFixed(6)} USD${u.costComplete ? '' : ' (reported portion)'} · ${secs(u.elapsedMs)} processing`;
+    $('#personalStat').textContent=`${fmt(u.decisions)} total decisions · ${fmt(u.jevDecisions||0)} Jev · ${fmt(u.runs)} tool calls · $${u.costUsd.toFixed(6)} USD${u.costComplete ? '' : ' (reported portion)'} · ${secs(u.elapsedMs)} processing`;
   } catch {}
 }
 void pollPersonal();

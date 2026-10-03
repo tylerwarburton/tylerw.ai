@@ -54,7 +54,7 @@ export async function aggregate(env: Env) {
     : null;
 
   return {
-    totals: { decisions, people, spent, cap: spendCap(env), runs: events.length },
+    totals: { jevDecisions:Number(await s.get('jevDecisions')||0),jevSpend:Number(await s.get('jevSpend')||0),textSpend:Number(await s.get('textSpend')||0), decisions, people, spent, cap: spendCap(env), runs: events.length },
     scam: {
       total: scamTotal,
       unsure,
@@ -88,7 +88,7 @@ export const onRequestPost = handler(async ({ env, request }) => {
   else if (action === 'unfreeze') await s.set('wall:frozen', '');
   else if (action === 'reset') {
     await s.clearEvents();
-    await Promise.all([s.set('decisions', '0'), s.set('wall:frozen', '')]);
+    await Promise.all([s.set('decisions', '0'), s.set('jevDecisions','0'), s.set('wall:frozen', '')]);
   } else return fail(400, 'Unknown action.');
   return json({ ok: true, action });
 });

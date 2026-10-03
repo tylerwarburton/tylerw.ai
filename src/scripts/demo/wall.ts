@@ -2,7 +2,7 @@
 // Presenter keys (needs ?key= on first load): F freeze/unfreeze, R reset.
 
 interface Wall {
-  totals: { decisions: number; people: number; spent: number; runs: number };
+  totals: { jevDecisions?:number; decisions: number; people: number; spent: number; runs: number };
   scam: { total: number; unsure: number; kinds: { kind: string; n: number }[] };
   xray: { apps: { id: string; name: string; n: number; risks: number; riskTotal: number }[]; worst: { name: string; risks: number; riskTotal: number } | null };
   jobs: { runs: number; avgSplit: Record<string, number> | null; mostExposed: { title: string; exposure: number } | null; borderline: string[] };
@@ -53,6 +53,7 @@ function bars(el: HTMLElement, rows: { id: string; label: string; n: number; col
 
 function render(w: Wall) {
   $('tDecisions').textContent = fmt(w.totals.decisions);
+  $('tJev').textContent=fmt(w.totals.jevDecisions||0);
   $('tPeople').textContent = fmt(w.totals.people);
   $('tSpent').textContent = `$${w.totals.spent.toFixed(2)}`;
 

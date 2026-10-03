@@ -13,6 +13,7 @@ import * as token from '../functions/api/token';
 import * as wall from '../functions/api/wall';
 import * as chat from '../functions/api/v1/chat/completions';
 import * as models from '../functions/api/v1/models';
+import * as decisions from '../functions/api/v1/systemone';
 import * as appSearch from '../functions/api/apps/search';
 import { resolveSecrets } from './secrets';
 
@@ -27,6 +28,7 @@ const routes: Record<string, Handler | undefined> = {
   'GET /api/wall': wall.onRequestGet,
   'POST /api/wall': wall.onRequestPost,
   'POST /api/v1/chat/completions': chat.onRequestPost,
+  'POST /api/v1/systemone': decisions.onRequestPost,
   'GET /api/v1/models': models.onRequestGet,
   'GET /api/apps/search': appSearch.onRequestGet,
 };
@@ -74,7 +76,7 @@ export default {
       const id = deviceId(request);
       if (id !== 'anon' && m.calls) {
         const s = await store(env);
-        await Promise.all(Object.entries({...m, elapsedMs, runs:1, decisions:typeof data.checks === 'number' ? data.checks : 0}).map(([k,v]) => s.incr(`usage:${id}:${k}`,v)));
+        await Promise.all(Object.entries({...m, elapsedMs, runs:1, decisions:typeof data.checks === 'number' ? data.checks : 0,jevDecisions:(m.stages||[]).reduce((n,s)=>n+s.decisions,0),jevSpend:(m.stages||[]).filter(s=>s.kind==='decision').reduce((n,s)=>n+s.costUsd,0),textSpend:(m.stages||[]).filter(s=>s.kind==='text').reduce((n,s)=>n+s.costUsd,0)}).filter((entry):entry is [string,number]=>typeof entry[1]==='number').map(([k,v]) => s.incr(`usage:${id}:${k}`,v)));
       }
       res = new Response(JSON.stringify({...data,runUsage}), {status:res.status, headers:res.headers});
     }

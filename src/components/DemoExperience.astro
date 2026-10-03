@@ -28,6 +28,7 @@ const titles: Record<string, string> = { scam: 'Scam Check', xray: 'App Privacy 
         <span class="x" aria-hidden="true">×</span>
         <a class="mark mark-site" href="/"><span class="dot" aria-hidden="true"></span>tylerw.ai</a>
         <h1 class="d-title">System 1, <span class="live">live</span></h1>
+        <span class="engine-tag">Jev 1.13</span>
       </div>
       <div class="usage-grid" aria-live="polite"><div><span class="usage-label">The room</span><p class="d-stat mono" id="roomStat">Loading room totals…</p></div><div><span class="usage-label">Your session</span><p class="d-stat mono" id="personalStat">Loading your usage…</p><small>This browser tab · tool usage since tracking started</small></div></div>
     </header>
@@ -100,6 +101,7 @@ const titles: Record<string, string> = { scam: 'Scam Check', xray: 'App Privacy 
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7" /></svg> All tools
         </a>
         <h1 id="sheetTitle">{titles[tool]}</h1>
+        <span class="engine-tag">{tool === "jobs" ? "LLM extraction → Jev decisions" : "Jev · System One"}</span>
         <div id="runReceipt" aria-live="polite" aria-label="Latest run usage" hidden></div>
       </div>
       <div class="sheet-body">
@@ -1249,10 +1251,12 @@ const titles: Record<string, string> = { scam: 'Scam Check', xray: 'App Privacy 
   .usage-label { font-size:12px; text-transform:uppercase; letter-spacing:.09em; color:var(--d-muted); }
   .usage-grid .d-stat { margin:8px 0; line-height:1.7; color:var(--d-text); }
   .usage-grid small { color:var(--d-muted); font-size:11px; }
+  .engine-tag { font-size:11px; color:var(--d-accent); white-space:nowrap; }
+  .engine-usage { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:4px 12px; font-size:11px; color:var(--d-accent); margin-top:5px; }
   #runReceipt { margin-left:auto; min-width:0; }
   .sheet-bar { flex-wrap:wrap; }
   #runReceipt .run-receipt { margin:0; padding:0; border:0; gap:4px 12px; justify-content:flex-end; }
-  @media (max-width:600px) { #runReceipt { flex-basis:100%; margin-left:0; } #runReceipt .run-receipt { justify-content:flex-start; } }
+  @media (max-width:600px) { #runReceipt { flex-basis:100%; margin-left:0; } #runReceipt .run-receipt,.engine-usage { justify-content:flex-start; } }
   .run-receipt { display:flex; flex-wrap:wrap; gap:8px 18px; padding:12px 16px; border:1px solid var(--d-border); border-radius:12px; font-size:12px; color:var(--d-muted); margin-top:12px; }
   :global(.email-stage) { border:1px solid var(--d-border); border-radius:16px; padding:20px; margin:12px 0; }
   :global(.email-stage h3) { margin:0 0 8px; }

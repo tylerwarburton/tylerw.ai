@@ -83,7 +83,7 @@ export const onRequestPost = handler(async (ctx) => {
     const label = stage === 'spam' ? (spam >= .75 ? 'Likely spam' : pass ? 'No strong spam signals' : 'Uncertain — review this message') : top(r.answers.priority)[0];
     await gateStore.set(gateKey,pass ? 'priority' : '');
     await Promise.all([gateStore.addEvent('email',device,{stage},1),gateStore.incr('decisions',1)]);
-    return json({stage,label,pass,stopped:stage === 'spam' && !pass,checks:1,ms:r.ms,probability:stage === 'spam' ? spam : (r.answers.priority as Record<string,number>)['urgent action'], priority:stage === 'priority' ? r.answers.priority : undefined});
+    return json({model:r.model,stage,label,pass,stopped:stage === 'spam' && !pass,checks:1,ms:r.ms,probability:stage === 'spam' ? spam : (r.answers.priority as Record<string,number>)['urgent action'], priority:stage === 'priority' ? r.answers.priority : undefined});
   }
   const r = await judge(env, input, SCAM_QUESTIONS, 'Judge this text message, email or DM that someone received.');
   const a = r.answers;

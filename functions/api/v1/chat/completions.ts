@@ -2,7 +2,7 @@
 // Auth is a demo token from /api/token (never the real key). Each token is
 // capped in calls and expires at midnight; the model is limited to the demo's
 // fast models and output length is capped. Streaming is supported.
-import { assertBudget, fail, handler, models, reasoningFor, recordSpend, store, type Env, type Usage } from '../../_lib';
+import { assertBudget, fail, handler, models, reasoningFor, recordModelCall, store, type Env, type Usage } from '../../_lib';
 
 const MAX_OUT = 4096;
 
@@ -40,10 +40,12 @@ export const onRequestPost = handler(async (ctx) => {
 
   const allowed = allowedModels(env);
   const asked = String(payload.model || '');
-  const model = allowed.includes(asked) ? asked : allowed[0];
+  if(asked && !allowed.includes(asked))return fail(400,'That model is not available for text generation. Use /api/v1/systemone for decisions.');
+  const model = asked || allowed[0];
   const stream = payload.stream === true;
   const maxTokens = Math.min(Number(payload.max_tokens ?? payload.max_completion_tokens ?? 1024) || 1024, MAX_OUT);
 
+  const callStarted=Date.now();
   const upstream = await fetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',
     headers: {
@@ -64,12 +66,11 @@ export const onRequestPost = handler(async (ctx) => {
     }),
   });
 
-  await s.incr('decisions', 1);
 
   if (!stream || !upstream.body) {
     const text = await upstream.text();
     try {
-      await recordSpend(env, (JSON.parse(text) as { usage?: Usage }).usage);
+      await recordModelCall(env,'text',model,(JSON.parse(text) as { usage?: Usage }).usage,callStarted,upstream.ok?'ok':'failed');
     } catch {
       /* non-JSON error body */
     }
@@ -102,7 +103,7 @@ export const onRequestPost = handler(async (ctx) => {
           }
         }
       }
-      await recordSpend(env, usage);
+      await recordModelCall(env,'text',model,usage,callStarted,upstream.ok?'ok':'failed');
     })(),
   );
   return new Response(client, {
