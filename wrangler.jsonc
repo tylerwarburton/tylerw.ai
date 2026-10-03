@@ -12,6 +12,11 @@
   "compatibility_date": "2026-09-01",
   "secrets_store_secrets": [
     {
+      "binding": "MONID_SECRET",
+      "store_id": "1f6e20c36ce943dc855031c75036c613",
+      "secret_name": "MONID_API_KEY"
+    },
+    {
       "binding": "OPENROUTER_SECRET",
       "store_id": "1f6e20c36ce943dc855031c75036c613",
       "secret_name": "OPENROUTER_API_KEY"

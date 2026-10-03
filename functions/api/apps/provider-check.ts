@@ -3,10 +3,11 @@ import {handler,json,rateLimit,deviceId,HttpError} from '../_lib';
 let cached:unknown;
 export const onRequestGet=handler(async({env,request})=>{
  await rateLimit({...env,ROOM:undefined,DEMO_DB:undefined},`${deviceId(request)}:provider-check`,3);
- if(!env.MONID_API_KEY)return json({configured:false});
+ const key=env.MONID_API_KEY || await env.MONID_SECRET?.get().catch(()=>undefined);
+ if(!key)return json({configured:false});
  if(cached)return json(cached);
  async function call(path:string,input:unknown){
-  const r=await fetch(`https://api.monid.ai/v1/${path}`,{method:'POST',headers:{authorization:`Bearer ${env.MONID_API_KEY}`,'content-type':'application/json'},body:JSON.stringify(input),signal:AbortSignal.timeout(15000)});
+  const r=await fetch(`https://api.monid.ai/v1/${path}`,{method:'POST',headers:{authorization:`Bearer ${key}`,'content-type':'application/json'},body:JSON.stringify(input),signal:AbortSignal.timeout(15000)});
   if(!r.ok)throw new HttpError(502,`Monid catalog returned HTTP ${r.status}.`);
   return await r.json() as any;
  }
