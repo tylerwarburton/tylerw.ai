@@ -19,6 +19,7 @@ export interface Env {
   DEMO_SHARED_KEY?: string;
   /** Optional r.jina.ai key (raises the reader's rate limit for any-app X-ray). */
   JINA_API_KEY?: string;
+  MONID_API_KEY?: string;
   /** Legacy variable now used only for profile text extraction. Decisions are pinned separately. */
   DEMO_XRAY_MODEL?: string;
   /** Comma-separated fallbacks OpenRouter tries if the primary fails. */

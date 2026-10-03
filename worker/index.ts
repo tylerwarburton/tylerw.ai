@@ -15,6 +15,7 @@ import * as chat from '../functions/api/v1/chat/completions';
 import * as models from '../functions/api/v1/models';
 import * as decisions from '../functions/api/v1/systemone';
 import * as appSearch from '../functions/api/apps/search';
+import * as providerCheck from '../functions/api/apps/provider-check';
 import { resolveSecrets } from './secrets';
 
 type Handler = (ctx: never) => Promise<Response>;
@@ -31,6 +32,7 @@ const routes: Record<string, Handler | undefined> = {
   'POST /api/v1/systemone': decisions.onRequestPost,
   'GET /api/v1/models': models.onRequestGet,
   'GET /api/apps/search': appSearch.onRequestGet,
+  'GET /api/apps/provider-check': providerCheck.onRequestGet,
 };
 
 export default {
