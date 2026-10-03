@@ -186,13 +186,21 @@ interface RoomRpc {
 
 function roomStore(ns: DurableObjectNamespace): Store {
   const room = ns.get(ns.idFromName('room')) as unknown as RoomRpc;
+  const call=async<T>(operation:()=>Promise<T>):Promise<T>=>{
+    try{return await operation();}catch(error){
+      const message=error instanceof Error?error.message:String(error);
+      console.error('Room storage failure',message);
+      const limited=/quota|limit|exceed|budget/i.test(message);
+      throw new HttpError(503,limited?'The demo’s shared storage has reached a Cloudflare limit. The presenter needs to check Cloudflare usage.':'The demo’s shared storage is unavailable. Please ask the presenter to check Cloudflare.',{code:limited?'ROOM_LIMIT':'ROOM_UNAVAILABLE',retryable:false});
+    }
+  };
   return {
-    get: (k) => room.get(k),
-    set: (k, v) => room.set(k, v),
-    incr: (k, by) => room.incr(k, by),
-    addEvent: (tool, device, data, decisions) => room.addEvent(tool, device, JSON.stringify(data), decisions),
-    events: () => room.events(),
-    clearEvents: () => room.clearEvents(),
+    get: (k) => call(()=>room.get(k)),
+    set: (k, v) => call(()=>room.set(k,v)),
+    incr: (k, by) => call(()=>room.incr(k,by)),
+    addEvent: (tool, device, data, decisions) => call(()=>room.addEvent(tool,device,JSON.stringify(data),decisions)),
+    events: () => call(()=>room.events()),
+    clearEvents: () => call(()=>room.clearEvents()),
   };
 }
 
