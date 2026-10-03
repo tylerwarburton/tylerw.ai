@@ -2,6 +2,8 @@
 import {
   assertBudget,
   decide,
+  pool,
+  type DecisionResult,
   type DecisionQuestion,
   type DecisionAnswer,
   body,
@@ -90,7 +92,47 @@ export const onRequestPost = handler(async (ctx) => {
   return json({ ...card, cached: false });
 });
 
+// Keep complete context where possible; split questions instead of discarding policy text.
+async function policyDecisions(env: Parameters<typeof decide>[0], state: unknown, questions: Record<string,DecisionQuestion>): Promise<DecisionResult> {
+  const batches: Record<string,DecisionQuestion>[]=[];
+  let batch: Record<string,DecisionQuestion>={};
+  for(const [key,q] of Object.entries(questions)) {
+    const next={...batch,[key]:q};
+    if(JSON.stringify({state,questions:next}).length>100000 && Object.keys(batch).length) {
+      batches.push(batch); batch={[key]:q};
+    } else batch=next;
+  }
+  if(Object.keys(batch).length)batches.push(batch);
+  const results=await pool(batches,2,qs=>decide(env,state,qs));
+  return {...results[0],answers:Object.assign({},...results.map(r=>r.answers))};
+}
+
 export async function score(env: Parameters<typeof decide>[0], policy: Policy): Promise<Scorecard> {
+  const started=Date.now();
+  // Unusually long paragraphs are preserved in bounded pieces, never truncated.
+  const clauses=policy.clauses.flatMap(text=>text.match(/[\s\S]{1,20000}/g)||[]);
+  const groups:string[][]=[];
+  let group:string[]=[];
+  for(const text of clauses) {
+    if(group.length && JSON.stringify([...group,text]).length>65000){groups.push(group);group=[];}
+    group.push(text);
+  }
+  if(group.length)groups.push(group);
+  if(groups.length<=1)return scorePart(env,{...policy,clauses});
+  const cards=await pool(groups,2,part=>scorePart(env,{...policy,clauses:part}));
+  const rows=cards[0].rows.map((_,i)=>{
+    const candidates=cards.map(c=>c.rows[i]);
+    const found=candidates.filter(r=>r.assessment!=='not_found');
+    const selected=found[0]||candidates[0];
+    const conflict=found.some(r=>r.assessment!==selected.assessment);
+    const owner=candidates.indexOf(selected);
+    const clause=selected.clause<0?-1:selected.clause+groups.slice(0,owner).reduce((n,g)=>n+g.length,0);
+    return {...selected,clause,...(conflict?{assessment:'unclear',summary:'Policy sections differ — review the source'}:{})};
+  });
+  return {...cards[0],rows,clauses:clauses.length,checks:cards.reduce((n,c)=>n+c.checks,0),ms:Date.now()-started,risks:rows.filter(r=>!r.good&&r.assessment==='stated').length};
+}
+
+async function scorePart(env: Parameters<typeof decide>[0], policy: Policy): Promise<Scorecard> {
   const started=Date.now();
   const keys=Object.keys(XRAY_QUESTIONS);
   const categories={
@@ -117,7 +159,7 @@ export async function score(env: Parameters<typeof decide>[0], policy: Policy): 
     questions[key]={type:'choice',instructions:`${instructions} Topic: ${topic} ${q.type==='noul'?q.hint||'':''}`,criteria:categories};
     questions[`${key}_source`]={type:'choice',instructions:`${instructions} Topic: ${topic} Select the strongest source passage for the topic, including explicit denials or conditions. Select none if absent.`,criteria:sources};
   }
-  const first=await decide(env,{app:policy.name,policy:passages},questions);
+  const first=await policyDecisions(env,{app:policy.name,policy:passages},questions);
   let checks=Object.keys(questions).length;
   const preliminary=keys.map(key=>{
     const a=first.answers[key] as Extract<DecisionAnswer,{type:'choice'}>;
@@ -132,7 +174,7 @@ export async function score(env: Parameters<typeof decide>[0], policy: Policy): 
   }
   let support:Record<string,DecisionAnswer>={};
   if(Object.keys(verify).length) {
-    try { const second=await decide(env,{policy:passages},verify);support=second.answers;checks+=Object.keys(verify).length; }
+    try { const second=await policyDecisions(env,{policy:passages},verify);support=second.answers;checks+=Object.keys(verify).length; }
     catch(error) { if(!(error instanceof HttpError) || error.status!==503)throw error; }
   }
   const labels:Record<string,string>={stated:'Stated in the policy',conditional:'Applies under stated conditions',denied:'Explicitly denied in the policy',not_found:'Not found in the supplied policy',unclear:'Unclear — review the source'};

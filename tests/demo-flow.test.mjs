@@ -110,3 +110,14 @@ test('attendee decision endpoint shares token limits, rejects other models, and 
   assert.equal((await request('/api/v1/chat/completions',{model:'typesafe/jev-1.13',messages:[]},'builder-test-123',headers)).status,400);
  }finally{globalThis.fetch=originalFetch;}
 });
+test('large policies retain every passage, bound request sizes, and flag cross-section conflicts',async()=>{
+ const clauses=Array.from({length:180},(_,i)=>`PASSAGE_${i} `+'Policy context including conditions. '.repeat(25));
+ const seen=new Set();let calls=0;
+ globalThis.fetch=async(url,init)=>{
+  calls++;assert.ok(init.body.length<=110000);const b=JSON.parse(init.body);
+  Object.values(b.state.policy).forEach(p=>seen.add(p));
+  const first=Object.values(b.state.policy)[0].startsWith('PASSAGE_0 ');
+  return response(b,Object.fromEntries(Object.entries(b.questions).map(([k,q])=>[k,q.type==='noul'?.95:k.endsWith('_source')?'p0':k==='location'?(first?'denied':'conditional'):'not_found'])));
+ };
+ try{const r=await score(env,{...policy,clauses});assert.equal(seen.size,180);assert.ok(calls>2);assert.equal(r.rows.find(r=>r.key==='location').assessment,'unclear');assert.equal(r.clauses,180);}finally{globalThis.fetch=originalFetch;}
+});
