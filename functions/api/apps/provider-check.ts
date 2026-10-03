@@ -1,10 +1,10 @@
 // Temporary, fixed, non-billable catalog diagnostic. Never returns credentials.
-import {handler,json,store,rateLimit,deviceId,HttpError} from '../_lib';
+import {handler,json,rateLimit,deviceId,HttpError} from '../_lib';
+let cached:unknown;
 export const onRequestGet=handler(async({env,request})=>{
- await rateLimit(env,`${deviceId(request)}:provider-check`,3);
+ await rateLimit({...env,ROOM:undefined,DEMO_DB:undefined},`${deviceId(request)}:provider-check`,3);
  if(!env.MONID_API_KEY)return json({configured:false});
- const s=await store(env);const cache=await s.get('monid-catalog-check');
- if(cache)return json(JSON.parse(cache));
+ if(cached)return json(cached);
  async function call(path:string,input:unknown){
   const r=await fetch(`https://api.monid.ai/v1/${path}`,{method:'POST',headers:{authorization:`Bearer ${env.MONID_API_KEY}`,'content-type':'application/json'},body:JSON.stringify(input),signal:AbortSignal.timeout(15000)});
   if(!r.ok)throw new HttpError(502,`Monid catalog returned HTTP ${r.status}.`);
@@ -19,5 +19,5 @@ export const onRequestGet=handler(async({env,request})=>{
    results.push({...meta,input:v.input,notes:v.notes});
   }else results.push(meta);
  }
- const out={configured:true,results};await s.set('monid-catalog-check',JSON.stringify(out));return json(out);
+ const out={configured:true,results};cached=out;return json(out);
 });
