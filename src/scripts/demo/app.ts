@@ -664,7 +664,7 @@ async function pollRoom() {
   try {
     room = await getJson<Room>('/api/wall');
     roomFailures=0;nextRoomPoll=Date.now()+15000;
-    $('#roomStat').textContent = `${fmt(room.totals.decisions)} total decisions · ${fmt(room.totals.jevDecisions||0)} Jev · ${fmt(room.totals.people)} people · $${room.totals.spent.toFixed(4)} USD spent`;
+    $('#roomStat').innerHTML = `<span><strong>${fmt(room.totals.decisions)}</strong> decisions</span><span><strong>${fmt(room.totals.jevDecisions||0)}</strong> Jev</span><span><strong>${fmt(room.totals.people)}</strong> people</span><span><strong>$${room.totals.spent.toFixed(4)}</strong> USD</span>`;
   } catch {
     roomFailures++;nextRoomPoll=Date.now()+Math.min(60000,15000*2**Math.min(roomFailures,2));
   } finally {pollingRoom=false;}
@@ -674,7 +674,7 @@ async function pollPersonal() {
     const res=await fetch('/api/usage',{headers:{'x-device-id':deviceId()}});
     if (!res.ok) return;
     const u=await res.json();
-    $('#personalStat').textContent=`${fmt(u.decisions)} total decisions · ${fmt(u.jevDecisions||0)} Jev · ${fmt(u.runs)} tool calls · $${u.costUsd.toFixed(6)} USD${u.costComplete ? '' : ' (reported portion)'} · ${secs(u.elapsedMs)} processing`;
+    $('#personalStat').innerHTML=`<span><strong>${fmt(u.decisions)}</strong> decisions</span><span><strong>${fmt(u.jevDecisions||0)}</strong> Jev</span><span><strong>${fmt(u.runs)}</strong> runs</span><span><strong>$${Number(u.costUsd).toFixed(6)}</strong> USD${u.costComplete ? '' : ' (partial)'}</span><span><strong>${secs(u.elapsedMs)}</strong></span>`;
   } catch {}
 }
 void pollPersonal();
