@@ -6,8 +6,8 @@ import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {pathToFileURL} from 'node:url';
 const dir=await mkdtemp(join(tmpdir(),'demo-flow-'));
-await build({entryPoints:['worker/index.ts'],bundle:true,platform:'node',format:'esm',outfile:join(dir,'worker.mjs'),plugins:[{name:'cf-test',setup(b){b.onResolve({filter:/^cloudflare:workers$/},()=>({path:'cf',namespace:'stub'}));b.onLoad({filter:/.*/,namespace:'stub'},()=>({contents:'export class DurableObject {}'}));}}]});
-const {default:worker}=await import(pathToFileURL(join(dir,'worker.mjs')));
+await build({entryPoints:['worker/index.ts'],bundle:true,platform:'node',format:'esm',outfile:join(dir,'worker.mjs'),plugins:[{name:'cf-test',setup(b){b.onResolve({filter:/^cloudflare:workers$/},()=>({path:'cf',namespace:'stub'}));b.onLoad({filter:/.*/,namespace:'stub'},()=>({contents:'export class DurableObject {constructor(ctx){this.ctx=ctx;}}'}));}}]});
+const {default:worker,RoomStore}=await import(pathToFileURL(join(dir,'worker.mjs')));
 const env={OPENROUTER_API_KEY:'test-only',ASSETS:{fetch(){throw Error('Unexpected assets request');}}};
 const ctx={waitUntil(p){return p;},passThroughOnException(){}};
 const originalFetch=globalThis.fetch;
@@ -153,4 +153,20 @@ test('email filters pass below 40 percent and stop at the boundary',async()=>{
   assert.equal((await send('spam','threshold-spam-123')).stopped,true);
   assert.equal((await request('/api/tools/scam',{text,stage:'priority'},'threshold-spam-123')).status,409);
  }finally{globalThis.fetch=originalFetch;}
+});
+
+test('authorized usage reset zeros totals once and preserves budget history and tokens',async()=>{
+ const {DatabaseSync}=await import('node:sqlite');
+ const db=new DatabaseSync(':memory:');
+ const sql={exec(query,...params){const stmt=db.prepare(query);const rows=stmt.all(...params);return {toArray:()=>rows};}};
+ const storage={sql,transactionSync(fn){db.exec('BEGIN');try{const out=fn();db.exec('COMMIT');return out;}catch(e){db.exec('ROLLBACK');throw e;}}};
+ sql.exec('CREATE TABLE kv (k TEXT PRIMARY KEY, v TEXT NOT NULL)');
+ sql.exec('CREATE TABLE events (id INTEGER PRIMARY KEY AUTOINCREMENT, ts INTEGER NOT NULL, tool TEXT NOT NULL, device TEXT NOT NULL, data TEXT NOT NULL, decisions INTEGER NOT NULL)');
+ for(const [k,v] of Object.entries({spend:'.27',decisions:'120',jevDecisions:'50','usage:test:costUsd':'.12','tok:example':'preserved','monid-reserved-usd':'.01'}))sql.exec('INSERT INTO kv VALUES (?,?)',k,v);
+ sql.exec("INSERT INTO events (ts,tool,device,data,decisions) VALUES (1,'test','test','{}',1)");
+ const first=new RoomStore({storage},env);
+ assert.equal(first.get('spend'),'0');assert.equal(first.get('decisions'),'0');assert.equal(first.get('usage:test:costUsd'),null);assert.equal(first.events().length,0);
+ assert.equal(first.get('spend-before-reset'),'0.27');assert.equal(first.get('tok:example'),'preserved');assert.equal(first.get('monid-reserved-usd'),'.01');
+ first.incr('decisions',7);first.incr('spend',.01);
+ const second=new RoomStore({storage},env);assert.equal(second.get('decisions'),'7');assert.equal(second.get('spend'),'0.01');assert.equal(second.get('spend-before-reset'),'0.27');db.close();
 });

@@ -107,6 +107,19 @@ export class RoomStore extends DurableObject<Env> {
     this.sql.exec(
       'CREATE TABLE IF NOT EXISTS events (id INTEGER PRIMARY KEY AUTOINCREMENT, ts INTEGER NOT NULL, tool TEXT NOT NULL, device TEXT NOT NULL, data TEXT NOT NULL, decisions INTEGER NOT NULL)',
     );
+    // One-time presenter-authorized reset before the talk. The marker prevents
+    // later restarts/deploys from clearing new attendee activity.
+    this.ctx.storage.transactionSync(()=>{
+      const marker='maintenance:usage-reset:2026-10-03-talk';
+      if(this.get(marker))return;
+      // Keep historical charges in the budget guard while zeroing display totals.
+      this.incr('spend-before-reset',Number(this.get('spend')||0));
+      this.sql.exec('DELETE FROM events');
+      this.sql.exec("DELETE FROM kv WHERE k LIKE 'usage:%'");
+      for(const key of ['decisions','jevDecisions','spend','jevSpend','textSpend','dataSpend'])this.set(key,'0');
+      this.set('wall:frozen','');
+      this.set(marker,String(Date.now()));
+    });
   }
 
   getMany(keys:string[]):Record<string,string|null> {

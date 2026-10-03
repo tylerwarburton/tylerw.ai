@@ -229,7 +229,8 @@ export function spendCap(env: Env) {
 
 export async function assertBudget(env: Env) {
   const s = await store(env);
-  const spent = Number((await s.get('spend')) ?? 0);
+  const amounts=await readMany(s,['spend','spend-before-reset']);
+  const spent=Number(amounts.spend||0)+Number(amounts['spend-before-reset']||0);
   if (spent >= spendCap(env)) {
     throw new HttpError(402, 'Demo budget reached. Thanks for playing! Everything on this page still works on your own key.');
   }
