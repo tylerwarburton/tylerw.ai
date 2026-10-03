@@ -1,7 +1,7 @@
 // GET  /api/wall  ->  room totals for the projector (polled about once a second)
 // POST /api/wall  { action: "freeze" | "unfreeze" | "reset", key }  (presenter)
 // Nothing personal is returned: no message text, no device ids, no names.
-import { body, fail, handler, json, spendCap, store, type Env } from './_lib';
+import { body, fail, handler, json, spendCap, store, readMany, type Env } from './_lib';
 
 interface Ev {
   tool: string;
@@ -11,11 +11,12 @@ interface Ev {
   ts: number;
 }
 
-export async function aggregate(env: Env) {
+export async function aggregate(env: Env, supplied?:{values:Record<string,string|null>;events:Ev[]}) {
   const s = await store(env);
-  const events = (await s.events()) as Ev[];
-  const decisions = Number((await s.get('decisions')) ?? 0);
-  const spent = Number((await s.get('spend')) ?? 0);
+  const snapshot=supplied || (s.snapshot?await s.snapshot():{values:await readMany(s,['decisions','spend','jevDecisions','jevSpend','textSpend']),events:await s.events()});
+  const {events,values}=snapshot;
+  const decisions=Number(values.decisions||0);
+  const spent=Number(values.spend||0);
 
   const people = new Set(events.map((e) => e.device)).size;
   const scamKinds: Record<string, number> = {};
@@ -54,7 +55,7 @@ export async function aggregate(env: Env) {
     : null;
 
   return {
-    totals: { jevDecisions:Number(await s.get('jevDecisions')||0),jevSpend:Number(await s.get('jevSpend')||0),textSpend:Number(await s.get('textSpend')||0), decisions, people, spent, cap: spendCap(env), runs: events.length },
+    totals: { jevDecisions:Number(values.jevDecisions||0),jevSpend:Number(values.jevSpend||0),textSpend:Number(values.textSpend||0), decisions, people, spent, cap: spendCap(env), runs: events.length },
     scam: {
       total: scamTotal,
       unsure,
@@ -73,11 +74,24 @@ export async function aggregate(env: Env) {
   };
 }
 
+let cached:{until:number;data:unknown}|undefined;
+let pending:Promise<unknown>|undefined;
+let generation=0;
 export const onRequestGet = handler(async ({ env }) => {
-  const s = await store(env);
-  const frozen = await s.get('wall:frozen');
-  if (frozen) return json({ ...JSON.parse(frozen), frozen: true });
-  return json({ ...(await aggregate(env)), frozen: false });
+  if(cached&&cached.until>Date.now())return json(cached.data);
+  if(!pending){
+    const current=generation;
+    const work=(async()=>{
+      const s=await store(env);
+      const snapshot=s.snapshot?await s.snapshot():{values:await readMany(s,['wall:frozen','decisions','spend','jevDecisions','jevSpend','textSpend']),events:await s.events()};
+      const data=snapshot.values['wall:frozen']?{...JSON.parse(snapshot.values['wall:frozen']),frozen:true}:{...await aggregate(env,snapshot),frozen:false};
+      if(current===generation)cached={until:Date.now()+5000,data};
+      return data;
+    })();
+    pending=work;
+    void work.finally(()=>{if(pending===work)pending=undefined;}).catch(()=>undefined);
+  }
+  return json(await pending);
 });
 
 export const onRequestPost = handler(async ({ env, request }) => {
@@ -90,5 +104,6 @@ export const onRequestPost = handler(async ({ env, request }) => {
     await s.clearEvents();
     await Promise.all([s.set('decisions', '0'), s.set('jevDecisions','0'), s.set('wall:frozen', '')]);
   } else return fail(400, 'Unknown action.');
+  generation++;cached=undefined;pending=undefined;
   return json({ ok: true, action });
 });

@@ -99,6 +99,9 @@ export function deviceId(req: Request): string {
 // — Storage: D1 when bound, in-memory otherwise (local dev) ——————
 
 export interface Store {
+  getMany?(keys:string[]):Promise<Record<string,string|null>>;
+  incrMany?(values:Record<string,number>):Promise<void>;
+  snapshot?():Promise<{values:Record<string,string|null>;events:{tool:string;device:string;data:string;decisions:number;ts:number}[]}>;
   get(k: string): Promise<string | null>;
   set(k: string, v: string): Promise<void>;
   incr(k: string, by: number): Promise<number>;
@@ -178,6 +181,9 @@ async function d1Store(db: D1Database): Promise<Store> {
 }
 
 interface RoomRpc {
+  getMany(keys:string[]):Promise<Record<string,string|null>>;
+  incrMany(values:Record<string,number>):Promise<void>;
+  snapshot():Promise<{values:Record<string,string|null>;events:{tool:string;device:string;data:string;decisions:number;ts:number}[]}>;
   get(k: string): Promise<string | null>;
   set(k: string, v: string): Promise<void>;
   incr(k: string, by: number): Promise<number>;
@@ -193,10 +199,14 @@ function roomStore(ns: DurableObjectNamespace): Store {
       const message=error instanceof Error?error.message:String(error);
       console.error('Room storage failure',message);
       const limited=/quota|limit|exceed|budget/i.test(message);
-      throw new HttpError(503,limited?'The demo’s shared storage has reached a Cloudflare limit. The presenter needs to check Cloudflare usage.':'The demo’s shared storage is unavailable. Please ask the presenter to check Cloudflare.',{code:limited?'ROOM_LIMIT':'ROOM_UNAVAILABLE',retryable:false});
+      const reason=/daily|per day/i.test(message)?'daily_quota':/cpu/i.test(message)?'cpu_limit':/overload|too many requests/i.test(message)?'overloaded':/SQLITE_FULL|disk is full/i.test(message)?'storage_full':'unclassified';
+      throw new HttpError(503,limited?'Room storage is unavailable due to a Cloudflare limit. The exact limit needs checking in Worker logs.':'The demo’s shared storage is unavailable. Please ask the presenter to check Cloudflare.',{code:limited?'ROOM_LIMIT':'ROOM_UNAVAILABLE',reason,retryable:false});
     }
   };
   return {
+    getMany:keys=>call(()=>room.getMany(keys)),
+    incrMany:values=>call(()=>room.incrMany(values)),
+    snapshot:()=>call(()=>room.snapshot()),
     get: (k) => call(()=>room.get(k)),
     set: (k, v) => call(()=>room.set(k,v)),
     incr: (k, by) => call(()=>room.incr(k,by)),
@@ -505,4 +515,12 @@ export async function asset<T>(ctx: Ctx, path: string): Promise<T | null> {
   const type = res.headers.get('content-type') || '';
   if (!type.includes('json')) return null;
   return (await res.json()) as T;
+}
+
+export async function readMany(s:Store,keys:string[]){
+ return s.getMany?s.getMany(keys):Object.fromEntries(await Promise.all(keys.map(async k=>[k,await s.get(k)])));
+}
+export async function incrementMany(s:Store,values:Record<string,number>){
+ if(s.incrMany)return s.incrMany(values);
+ await Promise.all(Object.entries(values).map(([k,v])=>s.incr(k,v)));
 }

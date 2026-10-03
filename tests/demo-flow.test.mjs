@@ -121,3 +121,19 @@ test('large policies retain every passage, bound request sizes, and flag cross-s
  };
  try{const r=await score(env,{...policy,clauses});assert.equal(seen.size,180);assert.ok(calls>2);assert.equal(r.rows.find(r=>r.key==='location').assessment,'unclear');assert.equal(r.clauses,180);}finally{globalThis.fetch=originalFetch;}
 });
+test('room readers share one snapshot, and presenter reset invalidates cached totals',async()=>{
+ let reads=0;let decisions=42;
+ const rpc={snapshot:async()=>{reads++;await new Promise(r=>setTimeout(r,5));return {values:{decisions:String(decisions),spend:'.25'},events:[]};},clearEvents:async()=>{},set:async(k,v)=>{if(k==='decisions')decisions=Number(v);}};
+ const roomEnv={...env,DEMO_ADMIN_KEY:'test-presenter',ROOM:{idFromName:()=>1,get:()=>rpc}};
+ const get=()=>worker.fetch(new Request('https://example.com/api/wall'),roomEnv,ctx);
+ const pair=await Promise.all([get(),get()]);assert.equal(reads,1);assert.equal((await pair[0].json()).totals.decisions,42);
+ await get();assert.equal(reads,1);
+ const reset=await worker.fetch(new Request('https://example.com/api/wall',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action:'reset',key:'test-presenter'})}),roomEnv,ctx);
+ assert.equal(reset.status,200);assert.equal((await (await get()).json()).totals.decisions,0);assert.equal(reads,2);
+});
+test('personal totals use a single batched read',async()=>{
+ let calls=0;
+ const roomEnv={...env,ROOM:{idFromName:()=>1,get:()=>({getMany:async keys=>{calls++;return Object.fromEntries(keys.map(k=>[k,k.endsWith(':costUsd')?'.03':k.endsWith(':calls')||k.endsWith(':pricedCalls')?'2':'0']));}})}};
+ const res=await worker.fetch(new Request('https://example.com/api/usage',{headers:{'x-device-id':'batch-test-123'}}),roomEnv,ctx);
+ assert.equal(res.status,200);const data=await res.json();assert.equal(data.costUsd,.03);assert.equal(data.costComplete,true);assert.equal(calls,1);
+});

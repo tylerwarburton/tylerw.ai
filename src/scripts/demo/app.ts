@@ -655,13 +655,19 @@ interface Room {
   xray: { recent: string[] };
 }
 let room: Room | null = null;
+let pollingRoom=false;
+let nextRoomPoll=0;
+let roomFailures=0;
 async function pollRoom() {
+  if(document.visibilityState!=='visible'||pollingRoom||Date.now()<nextRoomPoll)return;
+  pollingRoom=true;
   try {
     room = await getJson<Room>('/api/wall');
+    roomFailures=0;nextRoomPoll=Date.now()+15000;
     $('#roomStat').textContent = `${fmt(room.totals.decisions)} total decisions · ${fmt(room.totals.jevDecisions||0)} Jev · ${fmt(room.totals.people)} people · $${room.totals.spent.toFixed(4)} USD spent`;
   } catch {
-    /* offline or not deployed: stay quiet */
-  }
+    roomFailures++;nextRoomPoll=Date.now()+Math.min(60000,15000*2**Math.min(roomFailures,2));
+  } finally {pollingRoom=false;}
 }
 async function pollPersonal() {
   try {
@@ -673,7 +679,8 @@ async function pollPersonal() {
 }
 void pollPersonal();
 void pollRoom();
-setInterval(() => document.visibilityState === 'visible' && void pollRoom(), 10_000);
+setInterval(()=>void pollRoom(),15_000);
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'){nextRoomPoll=0;void pollRoom();void pollPersonal();}});
 
 // Open deep links only after all tool openers and state are initialized.
 if (pageTool) openers[pageTool]?.();

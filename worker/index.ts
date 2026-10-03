@@ -3,7 +3,7 @@
 // Functions style, so they also run under `wrangler pages dev`); everything
 // else is the static Astro site in dist/.
 import { DurableObject } from 'cloudflare:workers';
-import { deviceId, store, type Env } from '../functions/api/_lib';
+import { deviceId, store, incrementMany, type Env } from '../functions/api/_lib';
 import * as usage from '../functions/api/usage';
 import * as scam from '../functions/api/tools/scam';
 import * as xray from '../functions/api/tools/xray';
@@ -76,7 +76,7 @@ export default {
       const id = deviceId(request);
       if (id !== 'anon' && m.calls) {
         const s = await store(env);
-        await Promise.all(Object.entries({...m, elapsedMs, runs:1, decisions:typeof data.checks === 'number' ? data.checks : 0,jevDecisions:(m.stages||[]).reduce((n,s)=>n+s.decisions,0),jevSpend:(m.stages||[]).filter(s=>s.kind==='decision').reduce((n,s)=>n+s.costUsd,0),textSpend:(m.stages||[]).filter(s=>s.kind==='text').reduce((n,s)=>n+s.costUsd,0)}).filter((entry):entry is [string,number]=>typeof entry[1]==='number').map(([k,v]) => s.incr(`usage:${id}:${k}`,v)));
+        await incrementMany(s,Object.fromEntries(Object.entries({...m, elapsedMs, runs:1, decisions:typeof data.checks === 'number' ? data.checks : 0,jevDecisions:(m.stages||[]).reduce((n,s)=>n+s.decisions,0),jevSpend:(m.stages||[]).filter(s=>s.kind==='decision').reduce((n,s)=>n+s.costUsd,0),textSpend:(m.stages||[]).filter(s=>s.kind==='text').reduce((n,s)=>n+s.costUsd,0)}).filter((entry):entry is [string,number]=>typeof entry[1]==='number').map(([k,v]) => [`usage:${id}:${k}`,v])));
       }
       res = new Response(JSON.stringify({...data,runUsage}), {status:res.status, headers:res.headers});
     }
@@ -107,6 +107,23 @@ export class RoomStore extends DurableObject<Env> {
     this.sql.exec(
       'CREATE TABLE IF NOT EXISTS events (id INTEGER PRIMARY KEY AUTOINCREMENT, ts INTEGER NOT NULL, tool TEXT NOT NULL, device TEXT NOT NULL, data TEXT NOT NULL, decisions INTEGER NOT NULL)',
     );
+  }
+
+  getMany(keys:string[]):Record<string,string|null> {
+    if(!keys.length)return {};
+    if(keys.length>80)throw new Error('Too many storage keys');
+    const rows=this.sql.exec<{k:string;v:string}>(`SELECT k,v FROM kv WHERE k IN (${keys.map(()=>'?').join(',')})`,...keys).toArray();
+    return Object.fromEntries(rows.map(r=>[r.k,r.v]));
+  }
+
+  incrMany(values:Record<string,number>) {
+    const entries=Object.entries(values);
+    if(entries.length>80||entries.some(([,v])=>!Number.isFinite(v)))throw new Error('Invalid counter batch');
+    this.ctx.storage.transactionSync(()=>{for(const [k,v] of entries)this.incr(k,v);});
+  }
+
+  snapshot() {
+    return {values:this.getMany(['wall:frozen','decisions','spend','jevDecisions','jevSpend','textSpend']),events:this.events()};
   }
 
   get(k: string): string | null {

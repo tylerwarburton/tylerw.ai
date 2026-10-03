@@ -107,13 +107,21 @@ function render(w: Wall) {
   prev = w;
 }
 
+let polling=false;
+let nextPoll=0;
+let failures=0;
 async function poll() {
+  if(document.visibilityState!=='visible'||polling||Date.now()<nextPoll)return;
+  polling=true;
   try {
-    const res = await fetch('/api/wall', { cache: 'no-store' });
-    if (res.ok) render((await res.json()) as Wall);
+    const res=await fetch('/api/wall',{cache:'no-store',signal:AbortSignal.timeout(10000)});
+    if(!res.ok)throw new Error('Room totals temporarily unavailable');
+    render((await res.json()) as Wall);
+    failures=0;nextPoll=Date.now()+5000;
   } catch {
-    $('wStatus').textContent = 'reconnecting…';
-  }
+    failures++;nextPoll=Date.now()+Math.min(60000,10000*2**Math.min(failures-1,3));
+    $('wStatus').textContent='Room totals unavailable · retrying automatically';
+  } finally {polling=false;}
 }
 
 async function presenter(action: string) {
@@ -124,7 +132,7 @@ async function presenter(action: string) {
     body: JSON.stringify({ action, key: adminKey }),
   });
   prevCounts.clear();
-  await poll();
+  nextPoll=0;await poll();
 }
 
 document.addEventListener('keydown', (e) => {
@@ -134,4 +142,5 @@ document.addEventListener('keydown', (e) => {
 });
 
 void poll();
-setInterval(poll, 1000);
+setInterval(poll, 5000);
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'){nextPoll=0;void poll();}});
