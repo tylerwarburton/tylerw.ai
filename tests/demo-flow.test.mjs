@@ -137,3 +137,20 @@ test('personal totals use a single batched read',async()=>{
  const res=await worker.fetch(new Request('https://example.com/api/usage',{headers:{'x-device-id':'batch-test-123'}}),roomEnv,ctx);
  assert.equal(res.status,200);const data=await res.json();assert.equal(data.costUsd,.03);assert.equal(data.costComplete,true);assert.equal(calls,1);
 });
+test('email filters pass below 40 percent and stop at the boundary',async()=>{
+ let probability=.399;
+ globalThis.fetch=async(url,init)=>response(JSON.parse(init.body),{scam:probability,spam:probability});
+ try{
+  const text='Please review the attached project document.';
+  const send=async(stage,device)=>(await request('/api/tools/scam',{text,stage},device)).json();
+  assert.equal((await send('scam','threshold-pass-123')).pass,true);
+  assert.equal((await send('spam','threshold-pass-123')).pass,true);
+  assert.equal((await request('/api/tools/scam',{text,stage:'priority'},'threshold-pass-123')).status,200);
+  probability=.4;
+  assert.equal((await send('scam','threshold-stop-123')).stopped,true);
+  assert.equal((await request('/api/tools/scam',{text,stage:'spam'},'threshold-stop-123')).status,409);
+  probability=.1;await send('scam','threshold-spam-123');probability=.4;
+  assert.equal((await send('spam','threshold-spam-123')).stopped,true);
+  assert.equal((await request('/api/tools/scam',{text,stage:'priority'},'threshold-spam-123')).status,409);
+ }finally{globalThis.fetch=originalFetch;}
+});

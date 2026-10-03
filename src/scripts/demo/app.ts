@@ -184,7 +184,7 @@ function renderEmail() {
     const blocked = emailResults.some(x => x.stopped);
     const label = r ? r.label || (r.band === 'legit' ? 'No strong scam signals' : r.band === 'scam' ? 'Likely scam' : 'Uncertain — verify the sender') : blocked ? 'Not run — an earlier check stopped the sequence' : emailBusy && i === emailResults.length ? 'Running live…' : 'Not run';
     const score=stage==='scam' ? r?.likelihood ?? 0 : r?.probability ?? 0;
-    const color=score >= .75 ? 'var(--d-bad)' : score > .25 ? 'var(--d-unsure)' : 'var(--d-good)';
+    const color=score >= .75 ? 'var(--d-bad)' : score >= .40 ? 'var(--d-unsure)' : 'var(--d-good)';
     const visual = r && stage === 'scam' ? '<div id="emailScamVisual" class="email-scam-visual"></div>'
       : r && stage === 'spam' ? `<div class="email-filter-result" style="--c:${color}"><strong>${esc(label)}</strong><div class="email-filter-number">${pct(r.probability || 0)}<small>spam likelihood</small></div>${pbar('Spam signals',r.probability || 0,color)}</div>`
       : r && stage === 'priority' ? `<div class="email-priority-options">${['urgent action','routine action','information only'].map((option,j)=>`<div class="email-priority-option ${r.label===option ? 'selected' : ''}" style="--c:${['var(--d-unsure)','var(--d-accent)','var(--d-good)'][j]}"><span aria-hidden="true">${['!','↗','i'][j]}</span><strong>${cap(option)}</strong><small>${['Time-sensitive action','Action without immediate urgency','Read when convenient'][j]}</small>${r.label===option ? '<b>Selected</b>' : ''}</div>`).join('')}</div>`
